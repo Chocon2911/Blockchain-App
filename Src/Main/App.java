@@ -24,19 +24,19 @@ public class App {
         File file = new File(filePath);
 
         try {
-        if (file.exists()) {
-            Gson gson = new GsonBuilder().setPrettyPrinting().create();
-            FileReader reader = new FileReader(file);
-            Blockchain blockchain = gson.fromJson(reader, Blockchain.class);
-            reader.close();
+            if (file.exists()) {
+                Gson gson = new GsonBuilder().setPrettyPrinting().create();
+                FileReader reader = new FileReader(file);
+                Blockchain blockchain = gson.fromJson(reader, Blockchain.class);
+                reader.close();
 
-            if (blockchain == null) {
-                System.out.println("initBlockchain(): Not good");
-                return null;
+                if (blockchain == null) {
+                    System.out.println("initBlockchain(): Not good");
+                    return null;
+                }
+                return blockchain;
             }
-            return blockchain;
-        }
-        else {
+            else {
                 int index = 0;
                 String version = "0.0.0.1";
                 String merkleRoot = "0000000000000000000000000000000000000000000000000000000000000000";
