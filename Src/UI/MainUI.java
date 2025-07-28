@@ -13,7 +13,8 @@ public class MainUI {
             System.out.println("1. Start miner");
             System.out.println("2. Stop miner");
             System.out.println("3. Balance");
-            System.out.println("4. Exit");
+            System.out.println("4. Hash rate");
+            System.out.println("5. Exit");
             System.out.println("====================");
 
             int choice = new java.util.Scanner(System.in).nextInt();
@@ -29,6 +30,9 @@ public class MainUI {
                 System.out.println("Balance: " + balance / 100000000L + "." + balance % 100000000L + " BTC");
             }
             else if (choice == 4) {
+                System.out.println("Hash rate: " + miner.getHashRate() + " hashes/ms");
+            }
+            else if (choice == 5) {
                 miner.stopMine();
                 System.exit(0);
             }

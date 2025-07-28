@@ -1,15 +1,13 @@
 package Src.Model;
 
 import java.security.MessageDigest;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 public class Block {
     //==========================================Variable==========================================
     private final int index;
-    private final long timestamp;
+    private long timestamp;
     private final String version;
     private final String merkleRoot;
     private final String previousHash;
@@ -21,7 +19,6 @@ public class Block {
     //========================================Constructor=========================================
     public Block(int index, String version, String merkleRoot, String previousHash, int difficulty) {
         this.index = index;
-        this.timestamp = System.currentTimeMillis();
         this.version = version;
         this.merkleRoot = merkleRoot;
         this.previousHash = previousHash;
@@ -38,10 +35,10 @@ public class Block {
     public int getIndex() {
         return this.index;
     }
-    public String getTimestamp() {
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-        return sdf.format(new Date(this.timestamp));
+    public Long getTimestamp() {
+        return this.timestamp;
     }
+
     public int getDifficulty() {
         return this.difficulty;
     }
@@ -50,6 +47,17 @@ public class Block {
         return this.reward;
     }
     public List<Transaction> getTransactions() { return this.transactions; }
+    public String getHash() {
+        String input = this.index + this.previousHash + this.timestamp + this.version
+                + this.merkleRoot + this.nonce + this.difficulty;
+        return applySha256(input);
+    }
+    private long getInitReward() {
+        final double INITIAL_REWARD = 50;
+        int halvingInterval = 210000;
+        double halvingCount = (double) this.index / halvingInterval;
+        return (long) (INITIAL_REWARD / Math.pow(2, halvingCount) * 100000000L);
+    }
 
     //===========================================Method===========================================
     public static String applySha256(String input) {
@@ -72,6 +80,7 @@ public class Block {
     }
 
     public void mineBlock(Wallet wallet) {
+        this.timestamp = System.currentTimeMillis();
         String target = "0".repeat(this.difficulty);
         while (!this.getHash().substring(0, this.difficulty).equals(target)) {
             this.nonce++;
@@ -82,16 +91,10 @@ public class Block {
         System.out.println("Block mined: " + this.getHash());
     }
 
-    public String getHash() {
-        String input = this.index + this.previousHash + this.timestamp + this.version
-                + this.merkleRoot + this.nonce + this.difficulty;
-        return applySha256(input);
-    }
-
     @Override
     public String toString() {
         return "Block #" + this.index + " {\n" +
-                "  Timestamp: " + this.getTimestamp() + "\n" +
+                "  Timestamp: " + this.timestamp + "\n" +
                 "  Version: " + this.version + "\n" +
                 "  Previous Hash: " + this.previousHash + "\n" +
                 "  Nonce: " + this.nonce + "\n" +
@@ -99,12 +102,5 @@ public class Block {
                 "  Reward: " + this.reward + "\n" +
                 "  Transactions: " + this.transactions + "\n" +
                 "}";
-    }
-
-    private long getInitReward() {
-        final double INITIAL_REWARD = 50;
-        int halvingInterval = 210000;
-        double halvingCount = (double) this.index / halvingInterval;
-        return (long) (INITIAL_REWARD / Math.pow(2, halvingCount)) * 100000000L;
     }
 }

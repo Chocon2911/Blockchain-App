@@ -14,7 +14,19 @@ public class Miner
 
     public Blockchain getBlockchain() { return this.blockchain; }
     public Wallet getWallet() { return this.wallet; }
+    public Long getHashRate() {
+        Long start = System.currentTimeMillis();
+        Long end = System.currentTimeMillis();
+        Long times = 0L;
+        while (end - 1000 < start) {
+            end = System.currentTimeMillis();
+            times++;
+        }
 
+        return (times) / (end - start);
+    }
+
+    //========================================Constructor=========================================
     public Miner(Wallet wallet, Blockchain blockchain) {
         this.runningThreads = new ArrayList<>();
         this.wallet = wallet;

@@ -41,7 +41,7 @@ public class App {
                 String version = "0.0.0.1";
                 String merkleRoot = "0000000000000000000000000000000000000000000000000000000000000000";
                 String previousHash = "";
-                int difficulty = 6;
+                int difficulty = 4;
 
                 Block firstBlock = new Block(index, version, merkleRoot, previousHash, difficulty);
                 Blockchain blockchain = new Blockchain(firstBlock, difficulty, version, merkleRoot);
