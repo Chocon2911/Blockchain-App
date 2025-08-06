@@ -1,4 +1,4 @@
-package Src.Model;
+package Src.TransactionService.Model;
 
 import java.security.*;
 import java.util.Base64;

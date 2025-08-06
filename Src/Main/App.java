@@ -7,6 +7,9 @@ import Src.Model.Wallet;
 import Src.UI.MainUI;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import Src.Model.Transaction;
+import Src.Model.Network;
+
 
 import java.io.File;
 import java.io.FileReader;
