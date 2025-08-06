@@ -1,25 +1,22 @@
 package Src.Model;
 
+import java.security.MessageDigest;
+import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.List;
-
-import Src.Main.Util;
+import java.util.Map;
+import java.util.Queue;
+import static Src.Model.Miner.Config.DIFFICULTY;
 
 public class Miner
 {
-    //==========================================Variable==========================================
-    private final Blockchain blockchain;
-    private Wallet wallet;
-    private List<Thread> runningThreads;
 
+    //============================================Them============================================
+    public class Config {
+        public static final int DIFFICULTY = 4;
+    }
 
-
-
-
-//============================================Them============================================
-    private static final int DIFFICULTY = Block.getDifficulty();
-
-    public static void mineBlock(List<Transaction> tempmem, Map<String, Float> balances, Map<String, PublicKey> addressBook) throws Exception {
+    public static void mineBlock(Queue<Transaction> tempmem, Map<String, Float> balances, Map<String, PublicKey> addressBook, Blockchain blockchain) throws Exception {
         List<Transaction> validTransactions = new ArrayList<>();
 
         for (Transaction tx : tempmem) {
@@ -34,7 +31,7 @@ public class Miner
             }
 
             // Kiểm tra số dư
-            float balance = balances.getOrDefault(tx.sender);
+            float balance = balances.getOrDefault(tx.sender, 0.0f);
             if (tx.amount> balance) {
                 System.out.println("Không đủ số dư.");
                 valid = false;
@@ -43,7 +40,9 @@ public class Miner
             if (valid) {
                 validTransactions.add(tx);
                 balances.put(tx.sender, balance - tx.amount);
-                balances.put(tx.receiver, balances.getOrDefault(tx.receiver) + tx.amount);
+                float receiverBalance = balances.getOrDefault(tx.receiver, 0.0f);
+                balances.put(tx.receiver, receiverBalance + tx.amount);
+
             }
         }
 
@@ -92,68 +91,4 @@ public class Miner
         }
     }
 //============================================Them============================================
-
-
-
-
-
-
-
-    public Blockchain getBlockchain() { return this.blockchain; }
-    public Wallet getWallet() { return this.wallet; }
-    public Long getHashRate() {
-        Long start = System.currentTimeMillis();
-        Long end = System.currentTimeMillis();
-        Long times = 0L;
-        while (end - 1000 < start) {
-            end = System.currentTimeMillis();
-            times++;
-        }
-
-        return (times) / (end - start);
-    }
-
-    //========================================Constructor=========================================
-    public Miner(Wallet wallet, Blockchain blockchain) {
-        this.runningThreads = new ArrayList<>();
-        this.wallet = wallet;
-        this.blockchain = blockchain;
-    }
-
-    //===========================================Method===========================================
-    public void startMine() {
-        Thread thread = new Thread(() -> {
-            try {
-                while (!Thread.currentThread().isInterrupted()) {
-                    this.blockchain.mine(this.wallet);
-                }
-            } catch (Exception e) {
-                System.out.println("Exception Mining Thread: " + e.getMessage());
-            }
-
-            System.out.println("Mining Thread is stopped.");
-        });
-
-        this.runningThreads.add(thread);
-        thread.start();
-    }
-
-    public void stopMine() {
-        for (Thread thread : this.runningThreads) {
-            thread.interrupt();
-        }
-
-        this.runningThreads.clear();
-        synchronized (this.blockchain) {
-            Util.getInstance().SaveBlockchainJson(this.blockchain);
-        }
-        synchronized (this.wallet) {
-            Util.getInstance().SaveWalletJson(this.wallet);
-        }
-        System.out.println("Threads stopped");
-    }
-
-    public void setWallet(Wallet wallet) {
-        this.wallet = wallet;
-    }
 }

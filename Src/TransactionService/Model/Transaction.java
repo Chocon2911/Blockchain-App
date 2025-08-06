@@ -4,14 +4,14 @@ import java.security.*;
 import java.util.Base64;
 
 public class Transaction {
-    private String sender;
-    private String receiver;
-    private double amount;
+    String sender;
+    String receiver;
+    float amount;
 
     private byte[] signature;
     private PublicKey senderPublicKey;
 
-    public Transaction(String sender, String receiver, double amount) {
+    public Transaction(String sender, String receiver, float amount) {
         this.sender = sender;
         this.receiver = receiver;
         this.amount = amount;
@@ -27,7 +27,7 @@ public class Transaction {
 
     public boolean verifySignature() throws Exception {
         Signature ecdsaVerify = Signature.getInstance("SHA256withECDSA", "BC");
-        ecdsaVerify.initVerify(senderPublicKey);
+        ecdsaVerify.initVerify(this.senderPublicKey);
         ecdsaVerify.update(getMessageBytes());
         return ecdsaVerify.verify(signature);
     }

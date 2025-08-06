@@ -1,4 +1,11 @@
-import java.util.*;
+package Src.Model;
+
+import java.security.PublicKey;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+
 
 public class BlockchainDemo {
     public static void main(String[] args) throws Exception {
@@ -15,16 +22,23 @@ public class BlockchainDemo {
         Transaction tx = new Transaction(
                 sender.getAddress(),
                 receiver.getAddress(),
-                100.0f,
+                100.0f
         );
 
         tx.signTransaction(sender);
 
         System.out.println("Giao dịch vừa được tạo:");
-        System.out.println(tx);
-
+        tx.printInfo();
         Network.broadcastTransaction(tx);
 
-        Miner.mineBlock(Network.tempmem, balances, addressBook);
+        Blockchain blockchain = new Blockchain(); // tạo chuỗi mới
+        List<Transaction> validTransactions = List.of();
+        Block newBlock = new Block(blockchain.getLatestBlock().getHash(), validTransactions);
+        blockchain.addBlock(newBlock);
+
+
+        // Kiểm tra tính hợp lệ
+        System.out.println("Blockchain hợp lệ: " + blockchain.isChainValid());
     }
 }
+

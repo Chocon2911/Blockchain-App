@@ -1,7 +1,7 @@
-package Service;
+package Src.TransactionService.Service;
 
-import Model.Transaction;
-
+import Src.TransactionService.Model.Transaction;
+import Src.TransactionService.Util.Network;
 import java.util.UUID;
 
 public class TransactionService {
@@ -15,7 +15,7 @@ public class TransactionService {
     }
 
     public String addTransaction(Transaction tx) {
-        Network.BroadcastTransaction(tx);
+        Network.broadcastTransaction(tx);
         return UUID.randomUUID().toString();
     }
 }

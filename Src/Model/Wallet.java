@@ -2,7 +2,6 @@ package Src.Model;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bitcoinj.core.Base58;
-import java.math.BigInteger;
 import java.security.*;
 import java.security.spec.ECGenParameterSpec;
 

@@ -1,8 +1,12 @@
-package Controller;
+package Src.TransactionService.Controller;
 
-import Model.Transaction;
-import org.springframework.web.bind.annotation.*;
-import service.TransactionService;
+import Src.TransactionService.Model.Transaction;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+
+import Src.TransactionService.Service.TransactionService;
 
 @RestController
 @RequestMapping("/api/transactions")
