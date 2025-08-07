@@ -5,6 +5,7 @@ import Src.Model.Wallet;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.security.MessageDigest;
 
 public class Util {
     //==========================================Variable==========================================
@@ -37,5 +38,24 @@ public class Util {
         String filePath = "Src/Data/Blockchain.json";
         String json = blockchain.toJson();
         SaveJsonFile(filePath, json);
+    }
+
+    public String applySha256(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest(input.getBytes("UTF-8"));
+            StringBuilder hexString = new StringBuilder();
+
+            for (byte b : hashBytes) {
+                String hex = Integer.toHexString(0xff & b);
+                if(hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+
+            return hexString.toString();
+        }
+        catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

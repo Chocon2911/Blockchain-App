@@ -19,12 +19,26 @@ public class Blockchain {
         chain.add(newBlock);
     }
 
-    public Block getLatestBlock() {
-        return chain.get(chain.size() - 1);
+    //===========================================Method===========================================
+    public void mine(Wallet wallet) {
+        synchronized (this) {
+            this.getLastBlock().mineBlock(wallet);
+            this.createNewBlock();
+        }
     }
 
-    public List<Block> getChain() {
-        return chain;
+    public void createNewBlock() {
+        Block prevBlock = getLastBlock();
+        Block newBlock = new Block(prevBlock.getIndex() + 1, this.version, this.merkleRoot,
+                prevBlock.getHeader(), prevBlock.getNChainWork(), this.getDifficulty());
+        chain.add(newBlock);
+    }
+
+    public boolean addBlock(Block block) {
+        Block lastBlock = this.getLastBlock();
+        if (!block.getPreviousHash().equals(lastBlock.getHash())) return false;
+        this.chain.add(block);
+        return true;
     }
 
     public boolean isChainValid() {
@@ -32,16 +46,40 @@ public class Blockchain {
             Block current = chain.get(i);
             Block previous = chain.get(i - 1);
 
-            if (!current.getHash().equals(current.calculateHash())) {
-                System.out.println("Hash không khớp tại block " + i);
+            if (!current.getHeader().equals(current.getHeader())) {
+                System.out.println("Invalid hash at block " + current.getIndex());
                 return false;
             }
-
-            if (!current.getPreviousHash().equals(previous.getHash())) {
-                System.out.println("Liên kết previousHash bị lỗi tại block " + i);
+            if (!current.getPreviousHash().equals(previous.getHeader())) {
+                System.out.println("Invalid previous hash at block " + current.getIndex());
                 return false;
             }
         }
         return true;
+    }
+
+    public String toJson() {
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        return gson.toJson(this);
+    }
+
+    public void printChain() {
+        System.out.println(toJson());
+    }
+
+    public long getBalance(String publicKey) {
+        long balance = 0;
+        for (Block block : chain) {
+            for (Transaction transaction : block.getTransactions()) {
+                if (transaction.getReceiverKey().equals(publicKey)) {
+                    balance += transaction.getAmount();
+                }
+            }
+        }
+        return balance;
+    }
+
+    private int getDifficulty() {
+        return this.difficulty;
     }
 }
