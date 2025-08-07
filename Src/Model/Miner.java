@@ -1,72 +1,94 @@
 package Src.Model;
 
+import java.security.MessageDigest;
+import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.List;
-
-import Src.Main.Util;
+import java.util.Map;
+import java.util.Queue;
+import static Src.Model.Miner.Config.DIFFICULTY;
 
 public class Miner
 {
-    //==========================================Variable==========================================
-    private final Blockchain blockchain;
-    private Wallet wallet;
-    private List<Thread> runningThreads;
 
-    public Blockchain getBlockchain() { return this.blockchain; }
-    public Wallet getWallet() { return this.wallet; }
-    public Long getHashRate() {
-        Long start = System.currentTimeMillis();
-        Long end = System.currentTimeMillis();
-        Long times = 0L;
-        while (end - 1000 < start) {
-            end = System.currentTimeMillis();
-            times++;
-        }
-
-        return (times) / (end - start);
+    //============================================Them============================================
+    public class Config {
+        public static final int DIFFICULTY = 4;
     }
 
-    //========================================Constructor=========================================
-    public Miner(Wallet wallet, Blockchain blockchain) {
-        this.runningThreads = new ArrayList<>();
-        this.wallet = wallet;
-        this.blockchain = blockchain;
-    }
+    public static void mineBlock(Queue<Transaction> tempmem, Map<String, Float> balances, Map<String, PublicKey> addressBook, Blockchain blockchain) throws Exception {
+        List<Transaction> validTransactions = new ArrayList<>();
 
-    //===========================================Method===========================================
-    public void startMine() {
-        Thread thread = new Thread(() -> {
-            try {
-                while (!Thread.currentThread().isInterrupted()) {
-                    this.blockchain.mine(this.wallet);
-                }
-            } catch (Exception e) {
-                System.out.println("Exception Mining Thread: " + e.getMessage());
+        for (Transaction tx : tempmem) {
+            System.out.println("Đang kiểm tra giao dịch");
+            boolean valid = true;
+
+            // Kiểm tra chữ ký
+            PublicKey senderPublicKey = addressBook.get(tx.sender);
+            if (senderPublicKey == null || !tx.verifySignature(senderPublicKey)) {
+                System.out.println("Chữ ký không hợp lệ.");
+                valid = false;
             }
 
-            System.out.println("Mining Thread is stopped.");
-        });
+            // Kiểm tra số dư
+            float balance = balances.getOrDefault(tx.sender, 0.0f);
+            if (tx.amount> balance) {
+                System.out.println("Không đủ số dư.");
+                valid = false;
+            }
 
-        this.runningThreads.add(thread);
-        thread.start();
-    }
+            if (valid) {
+                validTransactions.add(tx);
+                balances.put(tx.sender, balance - tx.amount);
+                float receiverBalance = balances.getOrDefault(tx.receiver, 0.0f);
+                balances.put(tx.receiver, receiverBalance + tx.amount);
 
-    public void stopMine() {
-        for (Thread thread : this.runningThreads) {
-            thread.interrupt();
+            }
         }
 
-        this.runningThreads.clear();
-        synchronized (this.blockchain) {
-            Util.getInstance().SaveBlockchainJson(this.blockchain);
+        if (validTransactions.isEmpty()) {
+            System.out.println("Không có giao dịch hợp lệ để khai thác.");
+            return;
         }
-        synchronized (this.wallet) {
-            Util.getInstance().SaveWalletJson(this.wallet);
+
+        // Giải bài toán PoW
+        String blockData = validTransactions.toString();
+        int nonce = 0;
+        String hash = "";
+        while (true) {
+            String input = blockData + nonce;
+            hash = applySha256(input);
+            if (hash.startsWith("0".repeat(DIFFICULTY))) {
+                break;
+            }
+            nonce++;
         }
-        System.out.println("Threads stopped");
+
+        System.out.println("\nBlock đã được khai thác thành công!");
+        System.out.println("Hash: " + hash);
+        System.out.println("Giao dịch được xác thực: ");
+        for (Transaction tx : validTransactions) {
+            System.out.println(tx);
+        }
+
+        // Xóa khỏi tempmem
+        tempmem.removeAll(validTransactions);
     }
 
-    public void setWallet(Wallet wallet) {
-        this.wallet = wallet;
+    public static String applySha256(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(input.getBytes());
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hash) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+            return hexString.toString();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
+//============================================Them============================================
 }

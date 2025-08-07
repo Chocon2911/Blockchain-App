@@ -32,17 +32,8 @@ public class Block {
         this.difficulty = difficulty;
         this.transactions = new ArrayList<>();
     }
-
+    
     //==========================================Get Set===========================================
-    public String getPreviousHash() {
-        return this.previousHash;
-    }
-    public int getIndex() {
-        return this.index;
-    }
-    public Long getTimestamp() {
-        return this.timestamp;
-    }
     public int getDifficulty() {
         return this.difficulty;
     }

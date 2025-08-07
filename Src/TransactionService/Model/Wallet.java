@@ -1,4 +1,4 @@
-package Src.Model;
+package Src.TransactionService.Model;
 
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bitcoinj.core.Base58;

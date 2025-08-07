@@ -3,28 +3,20 @@ package Src.Model;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-
 public class Blockchain {
-    //==========================================Variable==========================================
-    private int difficulty;
-    private String version;
-    private String merkleRoot;
-    private final List<Block> chain;
+    private List<Block> chain;
 
-    //==========================================Get Set===========================================
-    public Block getLastBlock() {
-        return chain.getLast();
+    public Blockchain() {
+        this.chain = new ArrayList<>();
+        // Khởi tạo block đầu tiên (genesis block)
+        Block genesis = new Block("0", new ArrayList<>());
+        genesis.mineBlock();
+        chain.add(genesis);
     }
 
-    //========================================Constructor=========================================
-    public Blockchain(Block firstBlock, int difficulty, String version, String merkleRoot) {
-        this.chain = new ArrayList<>();
-        this.chain.add(firstBlock);
-        this.difficulty = difficulty;
-        this.version = version;
-        this.merkleRoot = merkleRoot;
+    public void addBlock(Block newBlock) {
+        newBlock.mineBlock();
+        chain.add(newBlock);
     }
 
     //===========================================Method===========================================

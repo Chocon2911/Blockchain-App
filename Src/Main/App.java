@@ -1,12 +1,12 @@
 package Src.Main;
 
-import Src.Model.Block;
 import Src.Model.Blockchain;
 import Src.Model.Miner;
 import Src.Model.Wallet;
 import Src.UI.MainUI;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+
 
 import java.io.File;
 import java.io.FileReader;

@@ -1,4 +1,4 @@
-package Src.Model;
+package Src.TransactionService.Model;
 
 import java.security.*;
 import java.util.Base64;
@@ -25,8 +25,7 @@ public class Transaction {
         this.senderPublicKey = senderWallet.getPublicKey();
     }
 
-    public boolean verifySignature(PublicKey senderPublicKey) throws Exception {
-        this.senderPublicKey = senderPublicKey;
+    public boolean verifySignature() throws Exception {
         Signature ecdsaVerify = Signature.getInstance("SHA256withECDSA", "BC");
         ecdsaVerify.initVerify(this.senderPublicKey);
         ecdsaVerify.update(getMessageBytes());
