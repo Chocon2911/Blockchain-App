@@ -1,30 +1,35 @@
 package Src.Model;
 
-import java.security.MessageDigest;
+import Src.Main.Util;
+
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
 public class Block {
     //==========================================Variable==========================================
+    private static final BigInteger MAX_TARGET = new BigInteger("FFFF0000000000000000000000000000000000000000000000000000", 16);
+
     private final int index;
     private long timestamp;
     private final String version;
     private final String merkleRoot;
     private final String previousHash;
+    private final BigInteger previousNChainWork;
     private int nonce;
     private final int difficulty;
-    private final long reward;
     private List<Transaction> transactions = new ArrayList<>();
 
     //========================================Constructor=========================================
-    public Block(int index, String version, String merkleRoot, String previousHash, int difficulty) {
+    public Block(int index, String version, String merkleRoot, String previousHash,
+                 BigInteger previousNChainWork, int difficulty) {
         this.index = index;
         this.version = version;
         this.merkleRoot = merkleRoot;
         this.previousHash = previousHash;
+        this.previousNChainWork = previousNChainWork;
         this.nonce = 0;
         this.difficulty = difficulty;
-        this.reward = this.getInitReward();
         this.transactions = new ArrayList<>();
     }
 
@@ -38,57 +43,73 @@ public class Block {
     public Long getTimestamp() {
         return this.timestamp;
     }
-
     public int getDifficulty() {
         return this.difficulty;
     }
-    public float getReward()
-    {
-        return this.reward;
-    }
     public List<Transaction> getTransactions() { return this.transactions; }
+
     public String getHash() {
-        String input = this.index + this.previousHash + this.timestamp + this.version
-                + this.merkleRoot + this.nonce + this.difficulty;
-        return applySha256(input);
+        return Util.getInstance().applySha256(Util.getInstance().applySha256(this.getHeader()));
     }
-    private long getInitReward() {
-        final double INITIAL_REWARD = 50;
-        int halvingInterval = 210000;
-        double halvingCount = (double) this.index / halvingInterval;
-        return (long) (INITIAL_REWARD / Math.pow(2, halvingCount) * 100000000L);
+    public String getHeader() {
+        String input = this.version + this.previousHash + this.merkleRoot + this.timestamp +
+                this.timestamp + this.getBits() + this.nonce;
+        return input;
+    }
+    private long getReward() {
+        final long INITIAL_REWARD = 50_0000_0000L; // 50 BTC * 10^8 (satoshi)
+        final int HALVING_INTERVAL = 210_000;
+        int halvings = this.index / HALVING_INTERVAL;
+
+        if (halvings >= 64) return 0;
+        return INITIAL_REWARD >> halvings;
+    }
+    public BigInteger getNChainWork() {
+        BigInteger target = getTarget();
+        BigInteger myWork = BigInteger.ONE.shiftLeft(256).divide(target.add(BigInteger.ONE));
+        if (previousHash == null) return myWork;
+        return this.previousNChainWork.add(myWork);
+    }
+    private BigInteger getTarget() {
+        return MAX_TARGET.divide(BigInteger.valueOf(this.difficulty));
+    }
+    private long getBits() {
+        byte[] bytes = this.getTarget().toByteArray();
+        if (bytes[0] == 0) {
+            byte[] tmp = new byte[bytes.length - 1];
+            System.arraycopy(bytes, 1, tmp, 0, tmp.length);
+            bytes = tmp;
+        }
+
+        int exponent = bytes.length;
+        int mantissa = 0;
+        for (int i = 0; i < Math.min(3, bytes.length); i++) {
+            mantissa <<= 8;
+            mantissa |= (bytes[i] & 0xff);
+        }
+
+        if ((mantissa & 0x00800000) != 0) {
+            mantissa >>= 8;
+            exponent += 1;
+        }
+
+        return ((long) exponent << 24) | (mantissa & 0x007fffff);
     }
 
     //===========================================Method===========================================
-    public static String applySha256(String input) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hashBytes = digest.digest(input.getBytes("UTF-8"));
-            StringBuilder hexString = new StringBuilder();
-
-            for (byte b : hashBytes) {
-                String hex = Integer.toHexString(0xff & b);
-                if(hex.length() == 1) hexString.append('0');
-                hexString.append(hex);
-            }
-
-            return hexString.toString();
-        }
-        catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     public void mineBlock(Wallet wallet) {
-        this.timestamp = System.currentTimeMillis();
-        String target = "0".repeat(this.difficulty);
-        while (!this.getHash().substring(0, this.difficulty).equals(target)) {
+        this.transactions.add(new Transaction(wallet.getPublicKey(), this.getReward()));
+        BigInteger target = getTarget();
+        while (true) {
+            String hashHex = Util.getInstance().applySha256(Util.getInstance()
+                    .applySha256(this.getHeader()));
+            BigInteger hashVal = new BigInteger(hashHex, 16);
+
+            if (hashVal.compareTo(target) <= 0) {
+                break;
+            }
             this.nonce++;
         }
-
-        Transaction rewardTransaction = new Transaction(wallet.getPublicKey(), this.reward);
-        this.transactions.add(rewardTransaction);
-        System.out.println("Block mined: " + this.getHash());
     }
 
     @Override
@@ -99,7 +120,7 @@ public class Block {
                 "  Previous Hash: " + this.previousHash + "\n" +
                 "  Nonce: " + this.nonce + "\n" +
                 "  Difficulty: " + this.difficulty + "\n" +
-                "  Reward: " + this.reward + "\n" +
+                "  Reward: " + this.getReward() + "\n" +
                 "  Transactions: " + this.transactions + "\n" +
                 "}";
     }

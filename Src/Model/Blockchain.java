@@ -31,15 +31,22 @@ public class Blockchain {
     public void mine(Wallet wallet) {
         synchronized (this) {
             this.getLastBlock().mineBlock(wallet);
-            this.addBlock();
+            this.createNewBlock();
         }
     }
 
-    public void addBlock() {
+    public void createNewBlock() {
         Block prevBlock = getLastBlock();
         Block newBlock = new Block(prevBlock.getIndex() + 1, this.version, this.merkleRoot,
-                prevBlock.getHash(), this.getDifficulty());
+                prevBlock.getHeader(), prevBlock.getNChainWork(), this.getDifficulty());
         chain.add(newBlock);
+    }
+
+    public boolean addBlock(Block block) {
+        Block lastBlock = this.getLastBlock();
+        if (!block.getPreviousHash().equals(lastBlock.getHash())) return false;
+        this.chain.add(block);
+        return true;
     }
 
     public boolean isChainValid() {
@@ -47,11 +54,11 @@ public class Blockchain {
             Block current = chain.get(i);
             Block previous = chain.get(i - 1);
 
-            if (!current.getHash().equals(current.getHash())) {
+            if (!current.getHeader().equals(current.getHeader())) {
                 System.out.println("Invalid hash at block " + current.getIndex());
                 return false;
             }
-            if (!current.getPreviousHash().equals(previous.getHash())) {
+            if (!current.getPreviousHash().equals(previous.getHeader())) {
                 System.out.println("Invalid previous hash at block " + current.getIndex());
                 return false;
             }
@@ -59,13 +66,11 @@ public class Blockchain {
         return true;
     }
 
-    // Chuyển blockchain thành JSON (pretty format)
     public String toJson() {
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
         return gson.toJson(this);
     }
 
-    // In ra toàn bộ blockchain
     public void printChain() {
         System.out.println(toJson());
     }
