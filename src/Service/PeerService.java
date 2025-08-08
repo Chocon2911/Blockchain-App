@@ -13,18 +13,25 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class PeerService {
+    //==========================================Variable==========================================
     private static final String ipAddressFilePath = "Db/IpAddresses.json";
     private static final int port = 18080;
     private static final String seedAddress = "127.0.0.1:18080";
     private static final HttpClient client = HttpClient.newHttpClient();
+    private static final int maxConnection = 117;
+    private static final Set<Socket> activeConnections = ConcurrentHashMap.newKeySet();
 
     public static void updateCurrNodeAddress(String address) {
 
     }
+
+
 
     //======================================Api Call Support======================================
     private static String fetchJsonFromApi(String urlString) {
@@ -72,12 +79,14 @@ public class PeerService {
         }
     }
 
-    //=======================================DNS Seed Node========================================
-    public static List<String> getIpAddresses() {
+
+
+    //========================================IP Addresses========================================
+    public static List<String> getGlobalIpAddresses() {
         List<String> ipList = new ArrayList<>();
 
         try {
-            String jsonResponse = fetchJsonFromApi("/dnsseed/nodes");
+            String jsonResponse = fetchJsonFromApi("/get_nodes");
 
             if (jsonResponse != null) {
                 JsonObject jsonObject = JsonParser.parseString(jsonResponse).getAsJsonObject();
@@ -108,6 +117,96 @@ public class PeerService {
         return ipList;
     }
 
+    public static void addIpToLocalFile(String newIp) {
+        try {
+            List<String> ipList = getLocalIpAddresses();
+            if (!ipList.contains(newIp)) {
+                ipList.add(newIp);
+                Gson gson = new Gson();
+                FileWriter writer = new FileWriter(ipAddressFilePath);
+                gson.toJson(ipList, writer);
+                writer.flush();
+                writer.close();
+            }
+        } catch (IOException e) {
+            System.err.println("Error writing to ip address file: " + e.getMessage());
+        }
+    }
+
+    public static boolean sendBlockToIp(String ip, Block block) {
+        try (Socket socket = new Socket()) {
+            // Thiết lập timeout kết nối
+            socket.connect(new InetSocketAddress(ip, 8333), 3000); // timeout 3s
+
+            // Gửi block dưới dạng JSON
+            OutputStream outputStream = socket.getOutputStream();
+            BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream));
+            String blockJson = new Gson().toJson(block);
+            writer.write(blockJson);
+            writer.newLine(); // kết thúc dòng để phía nhận biết
+            writer.flush();
+
+            // Đọc phản hồi (nếu cần)
+            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            String response = reader.readLine();
+            return "OK".equalsIgnoreCase(response);
+
+        } catch (IOException e) {
+            System.err.println("Socket error with " + ip + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    public static void listenForConnections() {
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
+            System.out.println("Listening port: " + port + "...");
+
+            while (true) {
+                Socket clientSocket = serverSocket.accept();
+
+                if (activeConnections.size() >= maxConnection) {
+                    // Quá nhiều kết nối, trả về thông báo từ chối
+                    try (OutputStream out = clientSocket.getOutputStream()) {
+                        out.write("Too many connections. Try again later.".getBytes());
+                    } catch (IOException ignored) {}
+                    clientSocket.close();
+                    continue;
+                }
+
+                // Thêm kết nối vào danh sách đang hoạt động
+                activeConnections.add(clientSocket);
+                System.out.println("Connected to: " + clientSocket.getRemoteSocketAddress());
+
+                // Tạo luồng riêng cho mỗi kết nối
+                new Thread(() -> handleClient(clientSocket)).start();
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void handleClient(Socket clientSocket) {
+        try (Socket socket = clientSocket;
+             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+             OutputStream out = socket.getOutputStream()) {
+
+            // Đọc và xử lý dữ liệu (ví dụ đơn giản)
+            String line;
+            while ((line = in.readLine()) != null) {
+                System.out.println("Nhận được từ " + socket.getRemoteSocketAddress() + ": " + line);
+                out.write(("Echo: " + line + "\n").getBytes());
+            }
+
+        } catch (IOException e) {
+            System.out.println("Ngắt kết nối với: " + clientSocket.getRemoteSocketAddress());
+        } finally {
+            activeConnections.remove(clientSocket);
+        }
+    }
+
+
+
     //============================================Node============================================
     public static boolean performHandshake(String ip, int port) {
         try (Socket socket = new Socket(ip, port);
@@ -121,7 +220,7 @@ public class PeerService {
             // Nhận message "verack"
             String response = in.readUTF();
             if (response.contains("verack")) {
-                System.out.println("Successfully hansake with " + ip);
+                System.out.println("Successfully handshake with " + ip);
                 return true;
             }
 
@@ -131,14 +230,44 @@ public class PeerService {
         return false;
     }
 
+
+
     //=========================================Broadcast==========================================
     public static void broadcastBlock(Block block) {
+        List<String> ipAddresses = getLocalIpAddresses();
+        int connectedCount = 0;
 
+        for (String address : ipAddresses) {
+            boolean connected = sendBlockToIp(address, block);
+
+            if (!connected) removeIpFromLocalFile(address);
+            connectedCount++;
+
+            if (connectedCount >= 8) return;
+        }
+
+        List<String> globalIpAddresses = getGlobalIpAddresses();
+        for (String address : globalIpAddresses) {
+            // Bỏ qua địa chỉ đã có trong danh sách local
+            if (ipAddresses.contains(address)) continue;
+
+            boolean connected = sendBlockToIp(address, block);
+            if (connected) {
+                connectedCount++;
+
+                // Thêm vào file lưu IP local nếu kết nối thành công
+                addIpToLocalFile(address);
+            }
+
+            if (connectedCount >= 8) break; // Đủ rồi thì thoát
+        }
     }
 
     public static void broadcastTransaction(Transaction transaction) {
 
     }
+
+
 
     //===========================================Listen===========================================
     public static void listen4NewTransaction() throws IOException {

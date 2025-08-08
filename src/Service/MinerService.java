@@ -42,6 +42,7 @@ public class MinerService {
             count++;
 
             if (!isFound.get()) continue;
+            BlockchainService.addBlock(block);
             PeerService.broadcastBlock(block);
         }
     }
