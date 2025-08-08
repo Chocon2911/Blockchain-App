@@ -1,7 +1,7 @@
-package Src.Main;
+package Main;
 
-import Src.Model.Blockchain;
-import Src.Model.Wallet;
+import Model.Blockchain;
+import Model.Wallet;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -11,6 +11,8 @@ public class Util {
     //==========================================Variable==========================================
     private static Util instance = new Util();
     public static Util getInstance() { return instance; }
+
+    public static final String version = "0.0.1";
 
     //========================================Constructor=========================================
     public Util() {}

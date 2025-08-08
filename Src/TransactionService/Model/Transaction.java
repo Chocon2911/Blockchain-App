@@ -1,4 +1,4 @@
-package Src.TransactionService.Model;
+package TransactionService.Model;
 
 import java.security.*;
 import java.util.Base64;
@@ -36,4 +36,6 @@ public class Transaction {
         System.out.println("Tx: " + sender + " → " + receiver + " : " + amount + " BTC");
         System.out.println("Chữ ký (base64): " + Base64.getEncoder().encodeToString(signature));
     }
+
+    public String getHash() { return null; }
 }

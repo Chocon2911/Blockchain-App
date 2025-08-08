@@ -1,12 +1,12 @@
-package Src.Main;
+package Main;
 
-import Src.Model.Blockchain;
-import Src.Model.Miner;
-import Src.Model.Wallet;
-import Src.UI.MainUI;
+import Model.Block;
+import Model.Blockchain;
+import Model.Miner;
+import Model.Wallet;
+import UI.MainUI;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-
 
 import java.io.File;
 import java.io.FileReader;
@@ -14,9 +14,8 @@ import java.io.FileWriter;
 
 public class App {
     public static void main(String[] args) {
-        Miner miner = new Miner(initWallet(), initBlockchain());
         MainUI mainUI = new MainUI();
-        mainUI.display(miner);
+        mainUI.display();
     }
 
     public static Blockchain initBlockchain() {
@@ -43,19 +42,15 @@ public class App {
                 String previousHash = "";
                 int difficulty = 4;
 
-                Block firstBlock = new Block(index, version, merkleRoot, previousHash, difficulty);
+                Block firstBlock = new Block(index, version, previousHash, null, difficulty);
                 Blockchain blockchain = new Blockchain(firstBlock, difficulty, version, merkleRoot);
-
                 File parentDir = new File(file.getParent());
-                if (!parentDir.exists()) {
-                    parentDir.mkdirs();
-                }
 
+                if (!parentDir.exists()) parentDir.mkdirs();
                 FileWriter writer = new FileWriter(file);
                 String json = blockchain.toJson();
                 writer.write(json);
                 writer.close();
-
                 return blockchain;
             }
         }

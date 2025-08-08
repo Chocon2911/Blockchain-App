@@ -1,40 +1,16 @@
-package Src.Model;
-
-import java.security.*;
-import java.util.Base64;
+package Model;
 
 public class Transaction {
-    String sender;
-    String receiver;
-    float amount;
+    private String receiverKey;
+    private long amount;
 
-    private byte[] signature;
-    private PublicKey senderPublicKey;
+    public String getReceiverKey() { return receiverKey; }
+    public long getAmount() { return amount; }
 
-    public Transaction(String sender, String receiver, float amount) {
-        this.sender = sender;
-        this.receiver = receiver;
+    public Transaction(String receiverKey, long amount) {
+        this.receiverKey = receiverKey;
         this.amount = amount;
     }
-    public byte[] getMessageBytes() {
-        return (sender + "->" + receiver + ":" + amount).getBytes();
-    }
 
-    public void signTransaction(Wallet senderWallet) throws Exception {
-        this.signature = senderWallet.sign(getMessageBytes());
-        this.senderPublicKey = senderWallet.getPublicKey();
-    }
-
-    public boolean verifySignature(PublicKey senderPublicKey) throws Exception {
-        this.senderPublicKey = senderPublicKey;
-        Signature ecdsaVerify = Signature.getInstance("SHA256withECDSA", "BC");
-        ecdsaVerify.initVerify(this.senderPublicKey);
-        ecdsaVerify.update(getMessageBytes());
-        return ecdsaVerify.verify(signature);
-    }
-
-    public void printInfo() {
-        System.out.println("Tx: " + sender + " → " + receiver + " : " + amount + " BTC");
-        System.out.println("Chữ ký (base64): " + Base64.getEncoder().encodeToString(signature));
-    }
+    public String getHash() { return null; }
 }
