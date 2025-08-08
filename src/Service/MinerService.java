@@ -4,7 +4,6 @@ package Service;
 import Main.Util;
 import Model.Block;
 import Model.Transaction;
-import TransactionService.Service.TransactionService;
 
 import java.math.BigInteger;
 import java.util.List;
@@ -15,7 +14,8 @@ public class MinerService {
         return Runtime.getRuntime().availableProcessors();
     }
 
-    public static void startMine(int processorsLimit, String publicAddress, AtomicBoolean canRun) {
+    public static void startMine(int processorsLimit, String publicAddress,
+                                 AtomicBoolean canRun, List<Transaction> addedTransactions) {
         AtomicBoolean foundNonce = new AtomicBoolean(false);
         Block block = BlockchainService.getBlock(BlockchainService.getBlockCount() - 1);
 
@@ -24,11 +24,11 @@ public class MinerService {
         String previousHash = block.getHash();
         BigInteger previousNChainWork = block.getNChainWork();
         int difficulty = block.getDifficulty();
-        List<Transaction> mempool = TransactionService.getMempool();
+        List<Transaction> mempool = addedTransactions;
 
-        // Create transaction and add to the block
+        Block newBlock = new Block(index, version, previousHash, previousNChainWork, difficulty, mempool);
         for (int i = 0; i < processorsLimit; i++) {
-            createMiningThread(block, publicAddress, i, processorsLimit, foundNonce, canRun);
+            createMiningThread(newBlock, publicAddress, i, processorsLimit, foundNonce, canRun);
         }
     }
 
@@ -42,7 +42,7 @@ public class MinerService {
             count++;
 
             if (!isFound.get()) continue;
-            // Broadcast block to the network
+            PeerService.broadcastBlock(block);
         }
     }
 }
