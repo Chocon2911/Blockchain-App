@@ -16,6 +16,13 @@
 
 
     <dependencies>
+        <!-- Google Gson for JSON processing -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.10.1</version>
+        </dependency>
+        
         <!-- ✅ BouncyCastle bản mới, đã fix CVE -->
         <dependency>
             <groupId>org.bouncycastle</groupId>
@@ -31,7 +38,9 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+            <version>3.2.5</version>
         </dependency>
+
 
         <!-- ✅ bitcoinj-core bản mới, exclude mọi thư viện cũ có lỗ hổng -->
         <dependency>
@@ -81,6 +90,10 @@
             <artifactId>okio</artifactId>
             <version>3.9.0</version>
         </dependency>
+        <dependency>
+            <groupId>org.fusesource.leveldbjni</groupId>
+            <artifactId>leveldbjni-all</artifactId>
+            <version>1.8</version>
+        </dependency>
     </dependencies>
-
 </project>

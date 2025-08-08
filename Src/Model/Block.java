@@ -1,8 +1,10 @@
-package Src.Model;
+package Model;
 
-import Src.Main.Util;
+import Main.Util;
+import com.google.gson.Gson;
 
 import java.math.BigInteger;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -13,7 +15,6 @@ public class Block {
     private final int index;
     private long timestamp;
     private final String version;
-    private final String merkleRoot;
     private final String previousHash;
     private final BigInteger previousNChainWork;
     private int nonce;
@@ -21,19 +22,25 @@ public class Block {
     private List<Transaction> transactions = new ArrayList<>();
 
     //========================================Constructor=========================================
-    public Block(int index, String version, String merkleRoot, String previousHash,
-                 BigInteger previousNChainWork, int difficulty) {
+    public Block(int index, String version, String previousHash,
+                 BigInteger previousNChainWork, int difficulty, List<Transaction> transactions) {
         this.index = index;
         this.version = version;
-        this.merkleRoot = merkleRoot;
         this.previousHash = previousHash;
         this.previousNChainWork = previousNChainWork;
         this.nonce = 0;
         this.difficulty = difficulty;
-        this.transactions = new ArrayList<>();
+        this.transactions = transactions;
     }
-    
+
     //==========================================Get Set===========================================
+    public String getPreviousHash() {
+        return this.previousHash;
+    }
+    public int getIndex() { return this.index; }
+    public Long getTimestamp() {
+        return this.timestamp;
+    }
     public int getDifficulty() {
         return this.difficulty;
     }
@@ -43,7 +50,7 @@ public class Block {
         return Util.getInstance().applySha256(Util.getInstance().applySha256(this.getHeader()));
     }
     public String getHeader() {
-        String input = this.version + this.previousHash + this.merkleRoot + this.timestamp +
+        String input = this.version + this.previousHash + this.getMerkleRoot() + this.timestamp +
                 this.timestamp + this.getBits() + this.nonce;
         return input;
     }
@@ -61,6 +68,7 @@ public class Block {
         if (previousHash == null) return myWork;
         return this.previousNChainWork.add(myWork);
     }
+
     private BigInteger getTarget() {
         return MAX_TARGET.divide(BigInteger.valueOf(this.difficulty));
     }
@@ -87,20 +95,39 @@ public class Block {
         return ((long) exponent << 24) | (mantissa & 0x007fffff);
     }
 
-    //===========================================Method===========================================
-    public void mineBlock(Wallet wallet) {
-        this.transactions.add(new Transaction(wallet.getPublicKey(), this.getReward()));
-        BigInteger target = getTarget();
-        while (true) {
-            String hashHex = Util.getInstance().applySha256(Util.getInstance()
-                    .applySha256(this.getHeader()));
-            BigInteger hashVal = new BigInteger(hashHex, 16);
-
-            if (hashVal.compareTo(target) <= 0) {
-                break;
-            }
-            this.nonce++;
+    public String getMerkleRoot() {
+        if (this.transactions == null || this.transactions.isEmpty()) {
+            return "";
         }
+
+        List<String> currentLayer = new ArrayList<>();
+        for (Transaction tx : this.transactions) {
+            currentLayer.add(tx.getHash());
+        }
+
+        while (currentLayer.size() > 1) {
+            List<String> nextLayer = new ArrayList<>();
+
+            for (int i = 0; i < currentLayer.size(); i += 2) {
+                String left = currentLayer.get(i);
+                String right = (i + 1 < currentLayer.size()) ? currentLayer.get(i + 1) : left;
+                String combinedHash = Util.getInstance().applySha256(left + right);
+                nextLayer.add(combinedHash);
+            }
+
+            currentLayer = nextLayer;
+        }
+
+        return currentLayer.get(0);
+    }
+
+    //===========================================Method===========================================
+    public boolean mineBlock(int nonce) {
+        BigInteger target = getTarget();
+        String hashHex = Util.getInstance().applySha256(Util.getInstance()
+                .applySha256(this.getHeader()));
+        BigInteger hashVal = new BigInteger(hashHex, 16);
+        return hashVal.compareTo(target) <= 0;
     }
 
     @Override

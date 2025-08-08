@@ -1,4 +1,4 @@
-package Src.Model;
+package Model;
 
 import java.security.PublicKey;
 import java.util.HashMap;

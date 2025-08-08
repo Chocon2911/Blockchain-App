@@ -1,5 +1,5 @@
-package Src.TransactionService.Util;
-import Src.TransactionService.Model.Transaction;
+package TransactionService.Util;
+import TransactionService.Model.Transaction;
 
 import java.util.*;
 
