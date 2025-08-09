@@ -4,7 +4,6 @@ package Service;
 import Main.Util;
 import Model.Block;
 import Model.Transaction;
-import TransactionService.Service.TransactionService;
 
 import java.math.BigInteger;
 import java.util.List;
