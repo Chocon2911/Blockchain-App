@@ -127,7 +127,10 @@ public class Block {
         String hashHex = Util.getInstance().applySha256(Util.getInstance()
                 .applySha256(this.getHeader()));
         BigInteger hashVal = new BigInteger(hashHex, 16);
-        return hashVal.compareTo(target) <= 0;
+
+        if (hashVal.compareTo(target) > 0) return false;
+        this.nonce = nonce;
+        return true;
     }
 
     @Override

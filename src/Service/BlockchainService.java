@@ -49,12 +49,39 @@ public class BlockchainService {
         }
     }
 
+    public static void increaseBlockCount() {
+        File jsonFile = new File("Db/BlockCount.json");
+
+        try {
+            int currentCount = getBlockCount();
+            if (currentCount == -1) return;
+
+            FileWriter writer = new FileWriter(jsonFile, false);
+            writer.write(String.valueOf(currentCount + 1));
+            writer.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     public static Block getBlock(int index) {
         String key = indexToKey(index);
         byte[] value = db.get(bytes(key));
 
         if (value == null) return null;
         return getBlockFromJson(asString(value));
+    }
+
+    public static void addBlock(Block block) {
+        try {
+            int index = getBlockCount();
+            String key = indexToKey(index);
+            String json = new Gson().toJson(block);
+            db.put(bytes(key), bytes(json));
+            increaseBlockCount();
+        } catch (Exception e) {
+            System.err.println("Lỗi khi thêm block: " + e.getMessage());
+        }
     }
 
     public static Block getBlockFromJson(String json) {
