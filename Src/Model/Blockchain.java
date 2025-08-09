@@ -75,18 +75,6 @@ public class Blockchain {
         System.out.println(toJson());
     }
 
-    public long getBalance(String publicKey) {
-        long balance = 0;
-        for (Block block : chain) {
-            for (Transaction transaction : block.getTransactions()) {
-                if (transaction.getReceiverKey().equals(publicKey)) {
-                    balance += transaction.getAmount();
-                }
-            }
-        }
-        return balance;
-    }
-
     private int getDifficulty() {
         return this.difficulty;
     }
