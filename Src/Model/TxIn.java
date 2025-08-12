@@ -5,10 +5,10 @@ public class TxIn {
     public int outputIndex; // Vị trí của output
     public byte[] scriptSig; // Chữ ký (giả lập)
 
-    public TxIn(String txid, int outputIndex, String scriptSig) {
+    public TxIn(String prevTxId, int outputIndex, String scriptSig) {
         this.prevTxId = prevTxId;
         this.outputIndex = outputIndex;
-        this.scriptSig = Wallet.getSign();
+        this.scriptSig = scriptSig != null ? scriptSig.getBytes() : new byte[0];
     }
     @Override
     public String toString() {
