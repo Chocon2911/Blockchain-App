@@ -1,10 +1,8 @@
 package Model;
 
 import Main.Util;
-import com.google.gson.Gson;
 
 import java.math.BigInteger;
-import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,6 +17,7 @@ public class Block {
     private final BigInteger previousNChainWork;
     private int nonce;
     private final int difficulty;
+    private final String merkleRoot;
     private List<Transaction> transactions = new ArrayList<>();
 
     //========================================Constructor=========================================
@@ -31,6 +30,19 @@ public class Block {
         this.nonce = 0;
         this.difficulty = difficulty;
         this.transactions = transactions;
+        this.merkleRoot = this.calculateMerkleTree();
+    }
+
+    public Block(int index, String version, String previousHash, BigInteger previousNChainWork,
+                 int difficulty, List<Transaction> transactions, String merkleRoot) {
+        this.index = index;
+        this.version = version;
+        this.previousHash = previousHash;
+        this.previousNChainWork = previousNChainWork;
+        this.nonce = 0;
+        this.difficulty = difficulty;
+        this.transactions = transactions;
+        this.merkleRoot = merkleRoot;
     }
 
     //==========================================Get Set===========================================
@@ -45,12 +57,13 @@ public class Block {
         return this.difficulty;
     }
     public List<Transaction> getTransactions() { return this.transactions; }
+    public String getMerkleRoot() { return this.merkleRoot; }
 
     public String getHash() {
         return Util.getInstance().applySha256(Util.getInstance().applySha256(this.getHeader()));
     }
     public String getHeader() {
-        String input = this.version + this.previousHash + this.getMerkleRoot() + this.timestamp +
+        String input = this.version + this.previousHash + this.calculateMerkleTree() + this.timestamp +
                 this.timestamp + this.getBits() + this.nonce;
         return input;
     }
@@ -95,32 +108,6 @@ public class Block {
         return ((long) exponent << 24) | (mantissa & 0x007fffff);
     }
 
-    public String getMerkleRoot() {
-        if (this.transactions == null || this.transactions.isEmpty()) {
-            return "";
-        }
-
-        List<String> currentLayer = new ArrayList<>();
-        for (Transaction tx : this.transactions) {
-            currentLayer.add(tx.getHash());
-        }
-
-        while (currentLayer.size() > 1) {
-            List<String> nextLayer = new ArrayList<>();
-
-            for (int i = 0; i < currentLayer.size(); i += 2) {
-                String left = currentLayer.get(i);
-                String right = (i + 1 < currentLayer.size()) ? currentLayer.get(i + 1) : left;
-                String combinedHash = Util.getInstance().applySha256(left + right);
-                nextLayer.add(combinedHash);
-            }
-
-            currentLayer = nextLayer;
-        }
-
-        return currentLayer.get(0);
-    }
-
     //===========================================Method===========================================
     public boolean mineBlock(int nonce) {
         BigInteger target = getTarget();
@@ -144,5 +131,31 @@ public class Block {
                 "  Reward: " + this.getReward() + "\n" +
                 "  Transactions: " + this.transactions + "\n" +
                 "}";
+    }
+
+    private String calculateMerkleTree() {
+        if (this.transactions == null || this.transactions.isEmpty()) {
+            return "";
+        }
+
+        List<String> currentLayer = new ArrayList<>();
+        for (Transaction tx : this.transactions) {
+            currentLayer.add(tx.getHash());
+        }
+
+        while (currentLayer.size() > 1) {
+            List<String> nextLayer = new ArrayList<>();
+
+            for (int i = 0; i < currentLayer.size(); i += 2) {
+                String left = currentLayer.get(i);
+                String right = (i + 1 < currentLayer.size()) ? currentLayer.get(i + 1) : left;
+                String combinedHash = Util.getInstance().applySha256(left + right);
+                nextLayer.add(combinedHash);
+            }
+
+            currentLayer = nextLayer;
+        }
+
+        return currentLayer.get(0);
     }
 }

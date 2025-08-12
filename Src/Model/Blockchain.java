@@ -38,7 +38,7 @@ public class Blockchain {
     public void createNewBlock() {
         Block prevBlock = getLastBlock();
         Block newBlock = new Block(prevBlock.getIndex() + 1, this.version, this.merkleRoot,
-                prevBlock.getHeader(), prevBlock.getNChainWork(), this.getDifficulty());
+                prevBlock.getNChainWork(), this.getDifficulty(), new ArrayList());
         chain.add(newBlock);
     }
 
