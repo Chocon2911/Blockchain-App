@@ -103,4 +103,29 @@
             <version>0.12</version>
         </dependency>
     </dependencies>
+
+    <build>
+        <!-- Project uses non-standard Java source root 'Src' -->
+        <sourceDirectory>Src</sourceDirectory>
+        <resources>
+            <!-- Keep resources under Db available on the classpath if needed -->
+            <resource>
+                <directory>Db</directory>
+                <includes>
+                    <include>**/*</include>
+                </includes>
+                <optional>true</optional>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.3.0</version>
+                <configuration>
+                    <mainClass>Main.BroadcastBlockTest</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>
