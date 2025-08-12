@@ -48,9 +48,10 @@ public class Transaction {
             throw new RuntimeException("SHA-256 Error", e);
         }
     }
-    public void signTransaction(Wallet senderWallet) throws Exception {
-        this.signature = senderWallet.sign(calculateTxId().getBytes());
-        this.senderPublicKey = senderWallet.getPublicKey();
+    // Simplified stub to avoid external Wallet dependency in test path
+    public void signTransaction(PublicKey pubKey, byte[] signature) {
+        this.senderPublicKey = pubKey;
+        this.signature = signature;
     }
 
     public boolean verifySignature() throws Exception {

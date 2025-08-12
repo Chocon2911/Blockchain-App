@@ -1,8 +1,5 @@
 package Model;
 
-import Main.Util;
-import com.google.gson.Gson;
-
 import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -47,7 +44,7 @@ public class Block {
     public List<Transaction> getTransactions() { return this.transactions; }
 
     public String getHash() {
-        return Util.getInstance().applySha256(Util.getInstance().applySha256(this.getHeader()));
+        return sha256(sha256(this.getHeader()));
     }
     public String getHeader() {
         String input = this.version + this.previousHash + this.getMerkleRoot() + this.timestamp +
@@ -111,7 +108,7 @@ public class Block {
             for (int i = 0; i < currentLayer.size(); i += 2) {
                 String left = currentLayer.get(i);
                 String right = (i + 1 < currentLayer.size()) ? currentLayer.get(i + 1) : left;
-                String combinedHash = Util.getInstance().applySha256(left + right);
+                String combinedHash = sha256(left + right);
                 nextLayer.add(combinedHash);
             }
 
@@ -124,13 +121,25 @@ public class Block {
     //===========================================Method===========================================
     public boolean mineBlock(int nonce) {
         BigInteger target = getTarget();
-        String hashHex = Util.getInstance().applySha256(Util.getInstance()
-                .applySha256(this.getHeader()));
+    String hashHex = sha256(sha256(this.getHeader()));
         BigInteger hashVal = new BigInteger(hashHex, 16);
 
         if (hashVal.compareTo(target) > 0) return false;
         this.nonce = nonce;
         return true;
+    }
+
+    // Lightweight SHA-256 helper to avoid external dependencies
+    private static String sha256(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(input.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : hash) hex.append(String.format("%02x", b));
+            return hex.toString();
+        } catch (Exception e) {
+            throw new RuntimeException("SHA-256 error", e);
+        }
     }
 
     @Override

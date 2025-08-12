@@ -2,10 +2,9 @@ package Model;
 
 public class TxOut {
     public String txId;
-    public static long value; // Số lượng Satoshi
+    public long value; // Số lượng Satoshi
     public int index;
     public String scriptPubKey; // Địa chỉ nhận (giả lập script)
-    public boolean isUTXO;
 
     public TxOut(String txId, int index, long value, String scriptPubKey) {
         this.txId = txId;
@@ -23,7 +22,5 @@ public class TxOut {
         return this.scriptPubKey.equals(pubKey);
     }
 
-    public static long getValue() {
-        return value;
-    }
+    public long getValue() { return value; }
 }
