@@ -1,6 +1,5 @@
 package Model;
 
-import Main.Util;
 import com.google.gson.Gson;
 
 import java.math.BigInteger;
@@ -47,7 +46,7 @@ public class Block {
     public List<Transaction> getTransactions() { return this.transactions; }
 
     public String getHash() {
-        return Util.getInstance().applySha256(Util.getInstance().applySha256(this.getHeader()));
+        return applySha256(applySha256(this.getHeader()));
     }
     public String getHeader() {
         String input = this.version + this.previousHash + this.getMerkleRoot() + this.timestamp +
@@ -102,7 +101,7 @@ public class Block {
 
         List<String> currentLayer = new ArrayList<>();
         for (Transaction tx : this.transactions) {
-            currentLayer.add(tx.getHash());
+            currentLayer.add(tx.getTxId());
         }
 
         while (currentLayer.size() > 1) {
@@ -111,7 +110,7 @@ public class Block {
             for (int i = 0; i < currentLayer.size(); i += 2) {
                 String left = currentLayer.get(i);
                 String right = (i + 1 < currentLayer.size()) ? currentLayer.get(i + 1) : left;
-                String combinedHash = Util.getInstance().applySha256(left + right);
+                String combinedHash = applySha256(left + right);
                 nextLayer.add(combinedHash);
             }
 
@@ -124,8 +123,7 @@ public class Block {
     //===========================================Method===========================================
     public boolean mineBlock(int nonce) {
         BigInteger target = getTarget();
-        String hashHex = Util.getInstance().applySha256(Util.getInstance()
-                .applySha256(this.getHeader()));
+        String hashHex = applySha256(applySha256(this.getHeader()));
         BigInteger hashVal = new BigInteger(hashHex, 16);
 
         if (hashVal.compareTo(target) > 0) return false;
@@ -144,5 +142,24 @@ public class Block {
                 "  Reward: " + this.getReward() + "\n" +
                 "  Transactions: " + this.transactions + "\n" +
                 "}";
+    }
+
+    private String applySha256(String input) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest(input.getBytes("UTF-8"));
+            StringBuilder hexString = new StringBuilder();
+
+            for (byte b : hashBytes) {
+                String hex = Integer.toHexString(0xff & b);
+                if(hex.length() == 1) hexString.append('0');
+                hexString.append(hex);
+            }
+
+            return hexString.toString();
+        }
+        catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }

@@ -5,6 +5,7 @@ import Model.Transaction;
 import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
 
+import java.net.Socket;
 import java.io.*;
 import java.lang.reflect.Type;
 import java.net.*;
@@ -12,6 +13,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,9 +29,12 @@ public class PeerService {
     private static final int maxConnection = 117;
     private static final Set<Socket> activeConnections = ConcurrentHashMap.newKeySet();
 
-    public static void updateCurrNodeAddress(String address) {
+    private static final String ipAddressPath = "Db/IpAddresses.json";
 
-    }
+
+     // danh sách host:port
+    private static final Gson gson = new Gson();
+
 
 
 
@@ -230,43 +235,52 @@ public class PeerService {
         return false;
     }
 
+    public static String getMyAddress(int port) {
+        try {
+            Enumeration<NetworkInterface> nets = NetworkInterface.getNetworkInterfaces();
+            while (nets.hasMoreElements()) {
+                NetworkInterface netIf = nets.nextElement();
+                if (netIf.isLoopback() || !netIf.isUp()) continue;
+
+                Enumeration<InetAddress> addresses = netIf.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress addr = addresses.nextElement();
+                    if (addr instanceof Inet4Address && !addr.isLoopbackAddress()) {
+                        return addr.getHostAddress() + ":" + port;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "127.0.0.1:" + port; // fallback nếu không lấy được IP mạng
+    }
+
+    public static void createIpAddressessFile(List<String> ips) {
+        try {
+            File folder = new File("Db");
+            if (!folder.exists()) {
+                folder.mkdirs();
+            }
+
+            File file = new File(ipAddressPath);
+            try (FileWriter writer = new FileWriter(file)) {
+                gson.toJson(ips, writer); // ghi nguyên list thành JSON array
+            }
+
+            System.out.println("Đã lưu file địa chỉ peer: " + file.getAbsolutePath());
+        } catch (IOException e) {
+            System.err.println("Lỗi khi tạo file địa chỉ: " + e.getMessage());
+        }
+    }
+
+
 
 
     //=========================================Broadcast==========================================
     public static void broadcastBlock(Block block) {
-        List<String> ipAddresses = getLocalIpAddresses();
-        int connectedCount = 0;
-
-        for (String address : ipAddresses) {
-            boolean connected = sendBlockToIp(address, block);
-
-            if (!connected) removeIpFromLocalFile(address);
-            connectedCount++;
-
-            if (connectedCount >= 8) return;
-        }
-
-        List<String> globalIpAddresses = getGlobalIpAddresses();
-        for (String address : globalIpAddresses) {
-            // Bỏ qua địa chỉ đã có trong danh sách local
-            if (ipAddresses.contains(address)) continue;
-
-            boolean connected = sendBlockToIp(address, block);
-            if (connected) {
-                connectedCount++;
-
-                // Thêm vào file lưu IP local nếu kết nối thành công
-                addIpToLocalFile(address);
-            }
-
-            if (connectedCount >= 8) break; // Đủ rồi thì thoát
-        }
-    }
-
-    public static void broadcastTransaction(Transaction transaction) {
 
     }
-
 
 
     //===========================================Listen===========================================
@@ -309,4 +323,102 @@ public class PeerService {
         // Check json format if Block or Transaction then handle it
         return true;
     }
+//==========================================getPeer===========================================
+
+    public List getPeersFromNode(String host, int port) throws IOException {
+        try (Socket socket = new Socket(host, port)) {
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+
+            // Gửi lệnh GETADDR
+            out.println("GETADDR");
+            out.flush();
+
+            // Nhận JSON
+            String json = in.readLine();
+            return gson.fromJson(json, List.class);
+        }
+    }
+
+    /**
+     * Broadcast transaction tới tất cả peers (theo giới hạn kết nối)
+     */
+    public static void broadcastTransaction(Transaction tx) {
+        String txJson = gson.toJson(tx);
+        List<String> peerAddresses;
+        // đọc file json
+        try (FileReader reader = new FileReader(ipAddressPath)) {
+            Type listType = new TypeToken<List<String>>() {}.getType();
+            peerAddresses = gson.fromJson(reader, listType);
+        } catch (IOException e) {
+            System.err.println("Lỗi đọc file địa chỉ peer: " + e.getMessage());
+            return;
+        }
+
+        for (String addr : peerAddresses) {
+            String[] parts = addr.split(":");
+            String host = parts[0];
+            int port = Integer.parseInt(parts[1]);
+
+            try (Socket socket = new Socket(host, port)) {
+                PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+                // truyền file json của object transaction cho nó
+                out.println("TX " + txJson);
+                out.flush();
+                System.out.println("Đã gửi TX tới " + addr);
+            } catch (IOException e) {
+                System.err.println("Không thể gửi TX tới " + addr + ": " + e.getMessage());
+            }
+        }
+    }
+
+
+//==========================l?ng nghe v… nh?n file json t? node kh c==========================
+    public static void listenForTransactions(int port) {
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
+            System.out.println("Listening for transactions on port " + port);
+
+            while (true) {
+                Socket socket = serverSocket.accept();
+                System.out.println("Kết nối từ: " + socket.getRemoteSocketAddress());
+
+                new Thread(() -> handleTransaction(socket)).start();
+                System.out.println("Send succesfully");
+            }
+
+        } catch (IOException e) {
+            System.err.println("Lỗi khi mở cổng: " + e.getMessage());
+        }
+    }
+
+    private static void handleTransaction(Socket socket) {
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
+
+            String json = in.readLine();
+            System.out.println(json);
+            if (json == null) {
+                out.println("ERROR: No data received");
+                return;
+            }
+
+            // Parse JSON thành object Transaction
+            Transaction tx = gson.fromJson(json, Transaction.class);
+
+            // Xác thực transaction
+            boolean valid = TransactionService.validateTransaction(tx);
+
+            if (valid) {
+                System.out.println("✅ Transaction hợp lệ: " + tx.getTxId());
+                out.println("OK");
+            } else {
+                System.out.println("❌ Transaction không hợp lệ: " + tx.getTxId());
+                out.println("FAIL");
+            }
+
+        } catch (IOException e) {
+            System.err.println("Lỗi khi nhận transaction: " + e.getMessage());
+        }
+    }
+
 }

@@ -36,12 +36,16 @@
         </dependency>
 
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-            <version>3.2.5</version>
+            <groupId>org.iq80.leveldb</groupId>
+            <artifactId>leveldb</artifactId>
+            <version>0.12</version>
         </dependency>
 
-
+        <dependency>
+            <groupId>org.fusesource.leveldbjni</groupId>
+            <artifactId>leveldbjni-all</artifactId>
+            <version>1.8</version>
+        </dependency>
         <!-- ✅ bitcoinj-core bản mới, exclude mọi thư viện cũ có lỗ hổng -->
         <dependency>
             <groupId>org.bitcoinj</groupId>

@@ -1,29 +1,27 @@
 package Model;
 
+import java.security.*;
+import java.security.PublicKey;
+
 public class TxOut {
-    public String txId;
-    public static long value; // Số lượng Satoshi
-    public int index;
-    public String scriptPubKey; // Địa chỉ nhận (giả lập script)
-    public boolean isUTXO;
+    private long value; // Số lượng Satoshi
+    private String publicAdd;
 
-    public TxOut(String txId, int index, long value, String scriptPubKey) {
-        this.txId = txId;
+
+    public TxOut(long value, String publicAdd) {
         this.value = value;
-        this.index = index;
-        this.scriptPubKey = scriptPubKey;
+        this.publicAdd = publicAdd;
     }
-
-    @Override
-    public String toString() {
-        return "TxOut{value=" + value + ", to=" + scriptPubKey + "}";
-    }
-
-    public boolean isOwnBy(String pubKey) {
-        return this.scriptPubKey.equals(pubKey);
-    }
-
-    public static long getValue() {
+    public long getValue() {
         return value;
     }
+
+    public String getPublicAdd() {
+        return publicAdd;
+    }
+    @Override
+    public String toString() {
+        return "TxOut{value=" + value + ", to=" + publicAdd + "}";
+    }
+
 }
