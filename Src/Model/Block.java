@@ -16,6 +16,7 @@ public class Block {
     private final BigInteger previousNChainWork;
     private int nonce;
     private final int difficulty;
+    private final String merkleRoot;
     private List<Transaction> transactions = new ArrayList<>();
 
     //========================================Constructor=========================================
@@ -28,6 +29,21 @@ public class Block {
         this.nonce = 0;
         this.difficulty = difficulty;
         this.transactions = transactions;
+        this.merkleRoot = this.calculateMerkleTree();
+        this.timestamp = System.currentTimeMillis();
+    }
+
+    public Block(int index, String version, String previousHash, BigInteger previousNChainWork,
+                 int difficulty, List<Transaction> transactions, String merkleRoot) {
+        this.index = index;
+        this.version = version;
+        this.previousHash = previousHash;
+        this.previousNChainWork = previousNChainWork;
+        this.nonce = 0;
+        this.difficulty = difficulty;
+        this.transactions = transactions;
+        this.merkleRoot = merkleRoot;
+        this.timestamp = System.currentTimeMillis();
     }
 
     //==========================================Get Set===========================================
@@ -42,16 +58,17 @@ public class Block {
         return this.difficulty;
     }
     public List<Transaction> getTransactions() { return this.transactions; }
+    public String getMerkleRoot() { return this.merkleRoot; }
 
     public String getHash() {
         return applySha256(applySha256(this.getHeader()));
     }
     public String getHeader() {
-        String input = this.version + this.previousHash + this.getMerkleRoot() + this.timestamp +
+        String input = this.version + this.previousHash + this.calculateMerkleTree() + this.timestamp +
                 this.timestamp + this.getBits() + this.nonce;
         return input;
     }
-    private long getReward() {
+    public long getReward() {
         final long INITIAL_REWARD = 50_0000_0000L; // 50 BTC * 10^8 (satoshi)
         final int HALVING_INTERVAL = 210_000;
         int halvings = this.index / HALVING_INTERVAL;
@@ -66,7 +83,7 @@ public class Block {
         return this.previousNChainWork.add(myWork);
     }
 
-    private BigInteger getTarget() {
+    public BigInteger getTarget() {
         return MAX_TARGET.divide(BigInteger.valueOf(this.difficulty));
     }
     private long getBits() {
@@ -90,32 +107,6 @@ public class Block {
         }
 
         return ((long) exponent << 24) | (mantissa & 0x007fffff);
-    }
-
-    public String getMerkleRoot() {
-        if (this.transactions == null || this.transactions.isEmpty()) {
-            return "";
-        }
-
-        List<String> currentLayer = new ArrayList<>();
-        for (Transaction tx : this.transactions) {
-            currentLayer.add(tx.getTxId());
-        }
-
-        while (currentLayer.size() > 1) {
-            List<String> nextLayer = new ArrayList<>();
-
-            for (int i = 0; i < currentLayer.size(); i += 2) {
-                String left = currentLayer.get(i);
-                String right = (i + 1 < currentLayer.size()) ? currentLayer.get(i + 1) : left;
-                String combinedHash = applySha256(left + right);
-                nextLayer.add(combinedHash);
-            }
-
-            currentLayer = nextLayer;
-        }
-
-        return currentLayer.get(0);
     }
 
     //===========================================Method===========================================
@@ -163,14 +154,38 @@ public class Block {
 
             for (byte b : hashBytes) {
                 String hex = Integer.toHexString(0xff & b);
-                if(hex.length() == 1) hexString.append('0');
+                if (hex.length() == 1) hexString.append('0');
                 hexString.append(hex);
             }
 
             return hexString.toString();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+    public String calculateMerkleTree() {
+        if (this.transactions == null || this.transactions.isEmpty()) {
+            return "";
+        }
+
+        List<String> currentLayer = new ArrayList<>();
+        for (Transaction tx : this.transactions) {
+            currentLayer.add(tx.getHash());
+        }
+
+        while (currentLayer.size() > 1) {
+            List<String> nextLayer = new ArrayList<>();
+
+            for (int i = 0; i < currentLayer.size(); i += 2) {
+                String left = currentLayer.get(i);
+                String right = (i + 1 < currentLayer.size()) ? currentLayer.get(i + 1) : left;
+                String combinedHash = sha256(left + right);
+                nextLayer.add(combinedHash);
+            }
+
+            currentLayer = nextLayer;
+        }
+
+        return currentLayer.get(0);
     }
 }

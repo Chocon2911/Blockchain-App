@@ -18,9 +18,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-// Removed unused static import
-
-public class PeerService {
+public class PeerS {
     //==========================================Variable==========================================
     private static final String ipAddressFilePath = "Db/IpAddresses.json";
     private static final int port = 18080;
@@ -280,7 +278,7 @@ public class PeerService {
         }
     }
 
-// thêm hàm này
+    // thêm hàm này
     public static void removeIpFromLocalFile(String ipToRemove) {
         try {
             List<String> ipList = getLocalIpAddresses();
@@ -372,8 +370,6 @@ public class PeerService {
     }
 
 
-
-
     //======================================Block Connection======================================
     //===Broadcast===
     public static void broadcastBlock(Block block) {
@@ -417,7 +413,6 @@ public class PeerService {
                  connectedCount++;
                  addIpToLocalFile(address);
              }
-
              if (connectedCount >= 8) break;
          }
 
@@ -542,7 +537,6 @@ public class PeerService {
     public static void listenForTransactions(int port) {
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             System.out.println("Listening for transactions on port " + port);
-
             while (true) {
                 Socket socket = serverSocket.accept();
                 System.out.println("Kết nối từ: " + socket.getRemoteSocketAddress());
@@ -556,9 +550,9 @@ public class PeerService {
         }
     }
 
-    private static void handleTransaction(Socket socket) {
+    private static void handleTransaction(Socket socket){
         try (BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
+             PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
 
             String json = in.readLine();
             System.out.println(json);
@@ -580,7 +574,6 @@ public class PeerService {
                 System.out.println("❌ Transaction không hợp lệ: " + tx.getTxId());
                 out.println("FAIL");
             }
-
         } catch (IOException e) {
             System.err.println("Lỗi khi nhận transaction: " + e.getMessage());
         }
