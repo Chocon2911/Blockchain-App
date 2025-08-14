@@ -59,7 +59,7 @@ public class MainUI {
         System.out.println("Mining...");
         System.out.print("Enter 2 to stop: ");
         AtomicBoolean canRun = new AtomicBoolean(true);
-        MinerService.startMine(processorsLimit, publicAddress, canRun);
+//        MinerService.startMine(processorsLimit, publicAddress, canRun);
         int input = new java.util.Scanner(System.in).nextInt();
         canRun.set(false);
     }

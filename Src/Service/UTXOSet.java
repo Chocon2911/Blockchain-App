@@ -37,8 +37,12 @@
 //
 
 
-package Model;
+package Service;
 
+import Model.Transaction;
+import Model.TxIn;
+import Model.TxOut;
+import Model.UTXO;
 import org.iq80.leveldb.*;
 import static org.iq80.leveldb.impl.Iq80DBFactory.*;
 

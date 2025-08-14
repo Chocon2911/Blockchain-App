@@ -4,8 +4,6 @@ import Service.PeerService;
 import Model.Block;
 
 import java.math.BigInteger;
-import java.util.ArrayList;
-import java.util.List;
 
 public class AnTest {
     public static void main(String[] args) {

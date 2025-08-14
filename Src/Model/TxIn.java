@@ -7,9 +7,9 @@ public class TxIn {
     public String prevTxId; // Hash của giao dịch trước
     public int outputIndex; // Vị trí của output
     public byte[] scriptSig; // Chữ ký (giả lập)
-    public String pubKey;
+    public PublicKey pubKey;
 
-    public TxIn(String txid, int outputIndex, String pubKey) {
+    public TxIn(String txid, int outputIndex, PublicKey pubKey) {
         this.prevTxId = txid;
         this.outputIndex = outputIndex;
         this.pubKey = pubKey;
@@ -23,7 +23,7 @@ public class TxIn {
     public int getPrevIndex() {
         return outputIndex;
     }
-    public String getPubKey() {
+    public PublicKey getPubKey() {
         return pubKey;
     }
     public byte[] getSignature() {

@@ -118,7 +118,6 @@
                 <includes>
                     <include>**/*</include>
                 </includes>
-                <optional>true</optional>
             </resource>
         </resources>
         <plugins>

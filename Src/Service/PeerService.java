@@ -12,21 +12,20 @@ import java.net.*;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class PeerS {
+public class PeerService {
     //==========================================Variable==========================================
     private static final String ipAddressFilePath = "Db/IpAddresses.json";
-    private static final int port = 18080;
+    private static final int newBlockPort = 18080;
+    private static final int newTransactionPort = 18081;
+    private static final int blockLocatorPort = 18082;
+    private static final int blockchainPort = 18083;
     private static final String seedAddress = "http://127.0.0.1:18080";
     private static final HttpClient client = HttpClient.newHttpClient();
     private static final int maxConnection = 117;
     private static final Set<Socket> activeConnections = ConcurrentHashMap.newKeySet();
-
     private static final String ipAddressPath = "Db/IpAddresses.json";
 
 
@@ -370,7 +369,7 @@ public class PeerS {
     }
 
 
-    //======================================Block Connection======================================
+    //===================================Mined Block Connection===================================
     //===Broadcast===
     public static void broadcastBlock(Block block) {
         if (block == null) {
@@ -389,7 +388,7 @@ public class PeerS {
 
         // Ưu tiên gửi tới danh sách local
         for (String address : ipAddresses) {
-            boolean connected = sendJsonToIp(address, blockJson);
+            boolean connected = sendJsonToIp(address, newBlockPort, blockJson);
 
             if (!connected) {
                 removeIpFromLocalFile(address);
@@ -408,7 +407,7 @@ public class PeerS {
          for (String address : globalIpAddresses) {
              if (ipAddresses.contains(address)) continue;
 
-             boolean connected = sendJsonToIp(address, blockJson);
+             boolean connected = sendJsonToIp(address, newBlockPort, blockJson);
              if (connected) {
                  connectedCount++;
                  addIpToLocalFile(address);
@@ -419,18 +418,16 @@ public class PeerS {
         System.out.println("[broadcastBlock] Done. Successful peers: " + connectedCount);
     }
 
-    public static boolean sendJsonToIp(String ip, String jsonLine) {
+    public static boolean sendJsonToIp(String ip, int port, String jsonLine) {
         try (Socket socket = new Socket()) {
             // Support "ip" or "ip:port" formats
             String host = ip;
-            int targetPort = 8333;
             if (ip.contains(":")) {
                 String[] parts = ip.split(":", 2);
                 host = parts[0];
-                try { targetPort = Integer.parseInt(parts[1]); } catch (NumberFormatException ignored) {}
             }
 
-            socket.connect(new InetSocketAddress(host, targetPort), 3000);
+            socket.connect(new InetSocketAddress(host, port), 3000);
             BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
             writer.write(jsonLine);
             writer.newLine();
@@ -445,7 +442,7 @@ public class PeerS {
     }
 
     //===Listen===
-    public static void ListenForBlock(int p) {
+    public static void listenForBlock(int p) {
         try (ServerSocket serverSocket = new ServerSocket(p)) {
             System.out.println("Block listener running on port " + p + " (max 117 concurrent)...");
 
@@ -475,7 +472,7 @@ public class PeerS {
 
                         String json = received.toString();
                         Block block = jsonToBlock(json);
-                        boolean valid = validateBlock(block);
+                        boolean valid = BlockchainService.examineBlock(block, clientSocket.getInetAddress().getHostAddress());
                         try (BufferedWriter writer = new BufferedWriter(new FileWriter("AnBlock.json"))) {
                             writer.write(json);
                             System.out.println("BLOCK JSON saved to AnBlock.json");
@@ -504,9 +501,9 @@ public class PeerS {
 
 
 
-    //===================================Transaction Connection===================================
+    //=================================New Transaction Connection=================================
     public static void broadcastTransaction(Transaction tx) {
-        String txJson = gson.toJson(tx);
+        String txJson = TransactionService.toTransactionJson(tx);
         List<String> peerAddresses;
         // đọc file json
         try (FileReader reader = new FileReader(ipAddressPath)) {
@@ -520,12 +517,11 @@ public class PeerS {
         for (String addr : peerAddresses) {
             String[] parts = addr.split(":");
             String host = parts[0];
-            int port = Integer.parseInt(parts[1]);
 
-            try (Socket socket = new Socket(host, port)) {
+            try (Socket socket = new Socket(host, newTransactionPort)) {
                 PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
                 // truyền file json của object transaction cho nó
-                out.println("TX " + txJson);
+                out.println(txJson);
                 out.flush();
                 System.out.println("Đã gửi TX tới " + addr);
             } catch (IOException e) {
@@ -562,7 +558,7 @@ public class PeerS {
             }
 
             // Parse JSON thành object Transaction
-            Transaction tx = gson.fromJson(json, Transaction.class);
+            Transaction tx = TransactionService.fromTransactionJson(json);
 
             // Xác thực transaction
             boolean valid = TransactionService.validateTransaction(tx);
@@ -578,7 +574,171 @@ public class PeerS {
             System.err.println("Lỗi khi nhận transaction: " + e.getMessage());
         }
     }
+
+
+
+    //================================Blockchain Reorg Connection=================================
+    public static void broadcastBlockLocator(String address) {
+        try {
+            String[] parts = address.split(":");
+            String host = parts[0];
+
+            List<String> locator = createBlockLocator();
+
+            Socket socket = new Socket(host, blockchainPort);
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+            out.println(new Gson().toJson(locator));
+
+            System.out.println("Sent block locator (" + locator.size() + " hashes) to " + address);
+            socket.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void listenForBlockLocator() {
+        try (ServerSocket serverSocket = new ServerSocket(blockchainPort)) {
+            System.out.println("Listening for block locator on port " + blockchainPort + "...");
+            while (true) {
+                Socket clientSocket = serverSocket.accept();
+                BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                String locatorJson = in.readLine();
+                List<String> locator = new Gson().fromJson(locatorJson, List.class);
+
+                System.out.println("Received block locator with " + locator.size() + " hashes.");
+
+                // Tìm fork point
+                Block forkBlock = findForkPoint(locator);
+                if (forkBlock != null) {
+                    System.out.println("Fork point at index: " + forkBlock.getIndex());
+
+                    // Truy từ forkBlock lên tip
+                    List<Block> blocksToSend = new ArrayList<>();
+                    int tipIndex = BlockchainService.getBlockCount() - 1;
+                    for (int i = forkBlock.getIndex() + 1; i <= tipIndex; i++) {
+                        Block b = BlockchainService.getBlock(i);
+                        if (b != null) {
+                            blocksToSend.add(b);
+                        }
+                    }
+
+                    // Gửi list block tới peer
+                    broadcastBlockchain(blocksToSend, serverSocket.getInetAddress().getHostAddress());
+
+                } else {
+                    System.out.println("No common block found.");
+                }
+                clientSocket.close();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static List<String> createBlockLocator() {
+        List<String> locator = new ArrayList<>();
+        int index = BlockchainService.getBlockCount() - 1;
+        int step = 1;
+        int added = 0;
+
+        while (index >= 0) {
+            Block block = BlockchainService.getBlock(index);
+            locator.add(block.getHash());
+            added++;
+
+            if (added >= 4) step *= 2;
+            index -= step;
+
+            if (index < 0) {
+                Block genesis = BlockchainService.getBlock(0);
+                locator.add(genesis.getHash());
+                break;
+            }
+        }
+        return locator;
+    }
+
+    private static Block findForkPoint(List<String> locator) {
+        for (String hash : locator) {
+            int totalBlocks = BlockchainService.getBlockCount();
+            for (int i = totalBlocks - 1; i >= 0; i--) {
+                Block localBlock = BlockchainService.getBlock(i);
+                if (localBlock.getHash().equals(hash)) {
+                    return localBlock;
+                }
+            }
+        }
+        return null;
+    }
+
+    //===================================Blockchain Connection====================================
+    public static void broadcastBlockchain(List<Block> blockchain, String address) {
+        try {
+            // Giả định blockchain gửi tới 1 peer, tạm hardcode địa chỉ peer
+
+            Socket socket = new Socket(address, blockchainPort);
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+
+            // Serialize sang JSON
+            String json = new Gson().toJson(blockchain);
+            out.println(json);
+
+            System.out.println("Broadcasted " + blockchain.size() + " blocks to " + address + ":" + blockchainPort);
+            socket.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void listenForBlockchain() {
+        try (ServerSocket serverSocket = new ServerSocket(blockchainPort)) {
+            System.out.println("Listening for blockchain data on port " + blockchainPort + "...");
+
+            while (true) {
+                Socket clientSocket = serverSocket.accept();
+                BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+
+                String json = in.readLine();
+                Block[] blocks = new Gson().fromJson(json, Block[].class);
+                List<Block> receivedBlocks = Arrays.asList(blocks);
+
+                if (receivedBlocks.isEmpty()) {
+                    System.out.println("Received empty blockchain data. Skipping.");
+                    clientSocket.close();
+                    continue;
+                }
+
+                System.out.println("Received " + receivedBlocks.size() + " blocks from peer.");
+
+                // 1️⃣ Xác định earliest index trong dữ liệu nhận
+                int earliestIndex = receivedBlocks.stream()
+                        .mapToInt(Block::getIndex)
+                        .min()
+                        .orElse(Integer.MAX_VALUE);
+
+                // 2️⃣ Xoá toàn bộ block từ earliestIndex trở đi trong local DB
+                int localCount = BlockchainService.getBlockCount();
+                for (int i = earliestIndex; i < localCount; i++) {
+                    BlockchainService.removeBlock(); // Xoá trong LevelDB
+                }
+
+                // Cập nhật lại block count sau khi xoá
+                File jsonFile = new File("Db/BlockCount.json");
+                try (FileWriter writer = new FileWriter(jsonFile, false)) {
+                    writer.write(String.valueOf(earliestIndex));
+                }
+
+                // 3️⃣ Add các block mới vào DB theo thứ tự
+                receivedBlocks.sort(Comparator.comparingInt(Block::getIndex));
+                for (Block b : receivedBlocks) {
+                    BlockchainService.addBlock(b);
+                    System.out.println("Added block #" + b.getIndex());
+                }
+
+                clientSocket.close();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }
-
-
-    

@@ -1,123 +1,22 @@
 package Service;
 
 import Model.*;
-import org.iq80.leveldb.WriteBatch;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonSerializer;
+import com.google.gson.Gson;
 
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.security.KeyFactory;
+import java.security.PublicKey;
+import java.security.spec.X509EncodedKeySpec;
+
+import com.google.gson.*;
+import java.util.Base64;
 
 
 
 public class TransactionService {
-
-    public static Queue<Transaction> mempool;
-    static {
-        mempool = new Queue<>() {
-            @Override
-            public int size() {
-                return 0;
-            }
-
-            @Override
-            public boolean isEmpty() {
-                return false;
-            }
-
-            @Override
-            public boolean contains(Object o) {
-                return false;
-            }
-
-            @Override
-            public Iterator<Transaction> iterator() {
-                return null;
-            }
-
-            @Override
-            public Object[] toArray() {
-                return new Object[0];
-            }
-
-            @Override
-            public <T> T[] toArray(T[] a) {
-                return null;
-            }
-
-            @Override
-            public boolean add(Transaction transaction) {
-                return false;
-            }
-
-            @Override
-            public boolean remove(Object o) {
-                return false;
-            }
-
-            @Override
-            public boolean containsAll(Collection<?> c) {
-                return false;
-            }
-
-            @Override
-            public boolean addAll(Collection<? extends Transaction> c) {
-                return false;
-            }
-
-            @Override
-            public boolean removeAll(Collection<?> c) {
-                return false;
-            }
-
-            @Override
-            public boolean retainAll(Collection<?> c) {
-                return false;
-            }
-
-            @Override
-            public void clear() {
-
-            }
-
-            @Override
-            public boolean equals(Object o) {
-                return false;
-            }
-
-            @Override
-            public int hashCode() {
-                return 0;
-            }
-
-            @Override
-            public boolean offer(Transaction transaction) {
-                return false;
-            }
-
-            @Override
-            public Transaction remove() {
-                return null;
-            }
-
-            @Override
-            public Transaction poll() {
-                return null;
-            }
-
-            @Override
-            public Transaction element() {
-                return null;
-            }
-
-            @Override
-            public Transaction peek() {
-                return null;
-            }
-        };
-    }
-
-
     public static boolean validateTransaction(Transaction tx) throws IOException {
         // 1. Transaction phải có input và output
         if (tx.getInputs() == null || tx.getInputs().isEmpty()) {
@@ -161,7 +60,7 @@ public class TransactionService {
 
             totalInputValue += utxo.getValue();
         }
-//UTXO laf 1 phan output chinhr total output value
+        //UTXO laf 1 phan output chinhr total output value
         // Tính tổng giá trị output
         for (TxOut txOut : tx.getOutputs()) {
             totalOutputValue += txOut.getValue();
@@ -248,5 +147,69 @@ public class TransactionService {
 
 
 
+    //========================================Json Convert========================================
+    //===Support===
+    public static final Gson gson = new GsonBuilder()
+            // byte[] <-> Base64
+            .registerTypeHierarchyAdapter(byte[].class, (JsonSerializer<byte[]>) (src, typeOfSrc, context) ->
+                    new JsonPrimitive(Base64.getEncoder().encodeToString(src))
+            )
+            .registerTypeHierarchyAdapter(byte[].class, (JsonDeserializer<byte[]>) (json, typeOfT, context) ->
+                    Base64.getDecoder().decode(json.getAsString())
+            )
+            // PublicKey <-> Base64
+            .registerTypeHierarchyAdapter(PublicKey.class, (JsonSerializer<PublicKey>) (src, typeOfSrc, context) ->
+                    new JsonPrimitive(Base64.getEncoder().encodeToString(src.getEncoded()))
+            )
+            .registerTypeHierarchyAdapter(PublicKey.class, (JsonDeserializer<PublicKey>) (json, typeOfT, context) -> {
+                try {
+                    byte[] bytes = Base64.getDecoder().decode(json.getAsString());
+                    KeyFactory keyFactory = KeyFactory.getInstance("EC"); // Hoặc "RSA" nếu bạn dùng RSA
+                    X509EncodedKeySpec spec = new X509EncodedKeySpec(bytes);
+                    return keyFactory.generatePublic(spec);
+                } catch (Exception e) {
+                    throw new JsonParseException(e);
+                }
+            })
+            .create();
+
+    //===Wallet===
+    public static Wallet fromWalletJson(String json) {
+        return gson.fromJson(json, Wallet.class);
+    }
+
+    public static String toWalletJson(Wallet wallet) {
+        return gson.toJson(wallet);
+    }
+
+
+    //===Transcation===
+    public static Transaction fromTransactionJson(String json) {
+        return gson.fromJson(json, Transaction.class);
+    }
+
+    public static String toTransactionJson(Transaction transaction) {
+        return gson.toJson(transaction);
+    }
+
+
+    //===TxIn===
+    public static TxIn fromTxInJson(String json) {
+        return gson.fromJson(json, TxIn.class);
+    }
+
+    public static String toTxInJson(TxIn txIn) {
+        return gson.toJson(txIn);
+    }
+
+
+    //===TxOut===
+    public static TxOut fromTxOutJson(String json) {
+        return gson.fromJson(json, TxOut.class);
+    }
+
+    public static String toTxOutJson(TxOut txOut) {
+        return gson.toJson(txOut);
+    }
 
 }

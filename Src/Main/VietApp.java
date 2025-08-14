@@ -3,8 +3,8 @@ package Main;
 import Model.*;
 import Service.PeerService;
 import Service.TransactionService;
+import Service.UTXOSet;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 

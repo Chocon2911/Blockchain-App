@@ -31,7 +31,7 @@ public class BlockchainService {
         }
     }
 
-    //===========================================Method===========================================
+    //=========================================Db Handler=========================================
     public static int getBlockCount() {
         File jsonFile = new File("Db/BlockCount.json");
 
@@ -62,6 +62,21 @@ public class BlockchainService {
 
             FileWriter writer = new FileWriter(jsonFile, false);
             writer.write(String.valueOf(currentCount + 1));
+            writer.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void decreaseBlockCount() {
+        File jsonFile = new File("Db/BlockCount.json");
+
+        try {
+            int currentCount = getBlockCount();
+            if (currentCount == -1) return;
+
+            FileWriter writer = new FileWriter(jsonFile, false);
+            writer.write(String.valueOf(currentCount - 1));
             writer.close();
         } catch (IOException e) {
             e.printStackTrace();
@@ -100,22 +115,34 @@ public class BlockchainService {
         return newBlock;
     }
 
-    public static boolean examineBlock(Block block) {
+    public static void removeBlock() {
+        int index = getBlockCount() - 1;
+        String key = indexToKey(index);
+        db.delete(bytes(key));
+        decreaseBlockCount();
+    }
+
+    //=======================================Block Verifier=======================================
+    public static boolean examineBlock(Block block, String senderAddress) {
         Block lastBlock = getLastBlock();
 
-        // 1. Kiểm tra index
+        // 1. Examine index
         if (block.getIndex() != lastBlock.getIndex() + 1) {
+            if (block.getIndex() > lastBlock.getIndex() + 1) {
+                PeerService.broadcastBlockLocator(senderAddress);
+            }
+
             System.out.println("Invalid index");
             return false;
         }
 
-        // 2. Kiểm tra previous hash
+        // 2. Verify previous hash with curr block
         if (!block.getPreviousHash().equals(lastBlock.getHash())) {
             System.out.println("Previous hash mismatch");
             return false;
         }
 
-        // 3. Kiểm tra Merkle Root
+        // 3. Check merkle root
         String expectedMerkle = block.calculateMerkleTree();
         List<Transaction> txs = block.getTransactions();
         if (!expectedMerkle.equals(block.calculateMerkleTree())) {
@@ -123,7 +150,7 @@ public class BlockchainService {
             return false;
         }
 
-        // 4. Kiểm tra timestamp (phải lớn hơn block trước và không vượt quá hiện tại + 2h)
+        // 4. Verify timestamp (not earlier than last block and not too far in the future)
         long now = System.currentTimeMillis() / 1000L;
         if (block.getTimestamp() <= lastBlock.getTimestamp()) {
             System.out.println("Invalid timestamp (too early)");
@@ -134,33 +161,38 @@ public class BlockchainService {
             return false;
         }
 
-        // 5. Kiểm tra difficulty và hash
+        // 5. Check difficulty and hash
         BigInteger target = new BigInteger(block.getHash(), 16);
         if (target.compareTo(block.getTarget()) > 0) {
             System.out.println("Hash does not meet difficulty target");
             return false;
         }
 
-        // 6. Kiểm tra NChainWork
+        // 6. Verify NChainWork
         if (!block.getNChainWork().equals(lastBlock.getNChainWork().add(
                 BigInteger.ONE.shiftLeft(256).divide(block.getTarget().add(BigInteger.ONE))))) {
             System.out.println("Invalid chain work");
             return false;
         }
 
-        // 7. Kiểm tra giao dịch (coinbase + valid signatures)
+        // 7. Check transactions
         if (txs.isEmpty()) {
             System.out.println("No transactions");
             return false;
         }
-        // Coinbase transaction check (simplified)
-        if (!txs.get(0).isCoinbase(block.getReward())) {
+
+        if (!txs.get(0).isCoinbase()) {
             System.out.println("Invalid coinbase transaction");
             return false;
         }
         for (int i = 1; i < txs.size(); i++) {
-            if (!TransactionService.validateTransaction(txs.get(i))) {
-                System.out.println("Invalid transaction found");
+            try {
+                if (!TransactionService.validateTransaction(txs.get(i))) {
+                    System.out.println("Invalid transaction found");
+                    return false;
+                }
+            } catch (Exception e) {
+                System.err.println("Error validating transaction: " + e.getMessage());
                 return false;
             }
         }
@@ -168,6 +200,7 @@ public class BlockchainService {
         return true;
     }
 
+    //============================================Json============================================
     public static Block getBlockFromJson(String json) {
         return new Gson().fromJson(json, Block.class);
     }
