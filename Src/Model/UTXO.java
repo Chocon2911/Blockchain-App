@@ -3,24 +3,43 @@ package Model;
 import java.security.PublicKey;
 
 public class UTXO {
-    private String txId;
-    private int index;
-    private long value;
-    private PublicKey owner;
+    private String txId;       // Transaction ID chứa output này
+    private int index;         // Vị trí của output trong transaction
+    private long value;      // Giá trị coin
+    private String pubAdd; // Chủ sở hữu
 
-    public UTXO(String txId, int index, long value, PublicKey owner) {
+    public UTXO(String txId, int index, long value, String pubAdd) {
         this.txId = txId;
         this.index = index;
         this.value = value;
-        this.owner = owner;
+        this.pubAdd = pubAdd;
     }
 
-    public boolean isOwnedBy(PublicKey pubKey) {
-        return this.owner.equals(pubKey);
+
+
+    public String getTxId() {
+        return txId;
+    }
+
+    public int getIndex() {
+        return index;
     }
 
     public long getValue() {
-        return this.value;
+        return value;
+    }
+
+    public String getPubAdd() {
+        return pubAdd;
+    }
+
+    @Override
+    public String toString() {
+        return "UTXO{" +
+                "txId='" + txId + '\'' +
+                ", index=" + index +
+                ", value=" + value +
+                ", publicKey=" + pubAdd +
+                '}';
     }
 }
-

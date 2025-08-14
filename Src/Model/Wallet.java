@@ -4,13 +4,14 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bitcoinj.core.Base58;
 import java.security.*;
 import java.security.spec.ECGenParameterSpec;
-import java.util.List;
+import java.security.spec.ECPrivateKeySpec;
 
+import org.bouncycastle.jce.ECNamedCurveTable;
+import org.bouncycastle.jce.spec.ECParameterSpec;
 
 public class Wallet {
-    private PrivateKey privateKey;
-    private static PublicKey publicKey;
-    private static byte[] lastSignature;
+    private byte[] privateKey;
+    private static byte[] publicKey;
     static {
         Security.addProvider(new BouncyCastleProvider());
     }
@@ -25,8 +26,23 @@ public class Wallet {
         ECGenParameterSpec ecSpec = new ECGenParameterSpec("secp256k1");
         keyGen.initialize(ecSpec, new SecureRandom());
         KeyPair keyPair = keyGen.generateKeyPair();
-        this.privateKey = keyPair.getPrivate();
-        this.publicKey = keyPair.getPublic();
+        this.privateKey = keyPair.getPrivate().getEncoded();
+        this.publicKey = keyPair.getPublic().getEncoded();
+    }
+
+    public byte[] getPublicKey() {
+        return publicKey;
+    }
+
+    public byte[] sign(byte[] data) throws Exception {
+        ECParameterSpec ecSpec = ECNamedCurveTable.getParameterSpec("secp256k1");
+        ECPrivateKeySpec privKeySpec = new ECPrivateKeySpec(new java.math.BigInteger(1, privateKey), ecSpec);
+
+        Signature ecdsaSign = Signature.getInstance("SHA256withECDSA", "BC");
+        KeyFactory kf = KeyFactory.getInstance("ECDSA", "BC");
+        ecdsaSign.initSign(kf.generatePrivate(privateKey));
+        ecdsaSign.update(data);
+        return ecdsaSign.sign();
     }
 
     public String getAddress() throws Exception {
@@ -54,33 +70,7 @@ public class Wallet {
         return Base58.encode(addressBytes);
     }
 
-    public byte[] sign(byte[] data) throws Exception {
-        Signature ecdsaSign = Signature.getInstance("SHA256withECDSA", "BC");
-        ecdsaSign.initSign(privateKey);
-        ecdsaSign.update(data);
-        return ecdsaSign.sign();
-    }
-
-    public static byte[] getSign() {
-        if (lastSignature == null) {
-            throw new IllegalStateException("Chưa có chữ ký nào. Hãy gọi signData() trước.");
-        }
-        return lastSignature;
-    }
-
-    public PublicKey getPublicKey() {
-        return publicKey;
-    }
 
 
-    public static long getBalance(List<TxOut> utxoSet) {
-        long balance = 0;
-        for (TxOut utxo : utxoSet) {
-            if (utxo.isOwnBy(String.valueOf(publicKey))) {
-                balance += utxo.getValue();
-            }
-        }
-        return balance;
-    }
 
 }
