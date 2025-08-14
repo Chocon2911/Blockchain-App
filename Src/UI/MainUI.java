@@ -1,6 +1,5 @@
 package UI;
 
-import Model.Miner;
 import Service.MinerService;
 
 import java.util.concurrent.atomic.AtomicBoolean;

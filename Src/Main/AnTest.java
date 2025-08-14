@@ -14,7 +14,7 @@ public class AnTest {
         final int listenPort = 5000;
 
         // 1) Khởi động listener cho Block (nghe tối đa 117 node)
-        new Thread(() -> PeerService.ListenOnPort(listenPort)).start();
+        new Thread(() -> PeerService.listenForBlock(listenPort)).start();
         sleep(600);
 
         // 2) Đảm bảo có địa chỉ 127.0.0.1:5000 trong danh bạ local để broadcast tới
