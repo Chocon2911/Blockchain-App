@@ -585,7 +585,7 @@ public class PeerService {
 
             List<String> locator = createBlockLocator();
 
-            Socket socket = new Socket(host, blockchainPort);
+            Socket socket = new Socket(host, blockLocatorPort);
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
             out.println(new Gson().toJson(locator));
 
@@ -597,8 +597,8 @@ public class PeerService {
     }
 
     public static void listenForBlockLocator() {
-        try (ServerSocket serverSocket = new ServerSocket(blockchainPort)) {
-            System.out.println("Listening for block locator on port " + blockchainPort + "...");
+        try (ServerSocket serverSocket = new ServerSocket(blockLocatorPort)) {
+            System.out.println("Listening for block locator on port " + blockLocatorPort + "...");
             while (true) {
                 Socket clientSocket = serverSocket.accept();
                 BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
