@@ -1,6 +1,5 @@
 package Service;
 
-import Main.Util;
 import Model.Block;
 import Model.Transaction;
 import com.google.gson.Gson;
@@ -93,7 +92,6 @@ public class BlockchainService {
     public static Block createNewBlock(List<Transaction> transactions) {
         Block block = BlockchainService.getBlock(BlockchainService.getBlockCount() - 1);
         int index = block.getIndex() + 1;
-        String version = Util.version;
         String previousHash = block.getHash();
         BigInteger previousNChainWork = block.getNChainWork();
         int difficulty = block.getDifficulty();

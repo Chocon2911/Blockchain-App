@@ -1,6 +1,7 @@
 package Model;
 
 import java.math.BigInteger;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -29,6 +30,7 @@ public class Block {
         this.difficulty = difficulty;
         this.transactions = transactions;
         this.merkleRoot = this.calculateMerkleTree();
+        this.timestamp = System.currentTimeMillis();
     }
 
     public Block(int index, String version, String previousHash, BigInteger previousNChainWork,
@@ -41,6 +43,7 @@ public class Block {
         this.difficulty = difficulty;
         this.transactions = transactions;
         this.merkleRoot = merkleRoot;
+        this.timestamp = System.currentTimeMillis();
     }
 
     //==========================================Get Set===========================================
@@ -65,7 +68,7 @@ public class Block {
                 this.timestamp + this.getBits() + this.nonce;
         return input;
     }
-    private long getReward() {
+    public long getReward() {
         final long INITIAL_REWARD = 50_0000_0000L; // 50 BTC * 10^8 (satoshi)
         final int HALVING_INTERVAL = 210_000;
         int halvings = this.index / HALVING_INTERVAL;
@@ -80,7 +83,7 @@ public class Block {
         return this.previousNChainWork.add(myWork);
     }
 
-    private BigInteger getTarget() {
+    public BigInteger getTarget() {
         return MAX_TARGET.divide(BigInteger.valueOf(this.difficulty));
     }
     private long getBits() {
@@ -143,7 +146,7 @@ public class Block {
                 "}";
     }
 
-    private String calculateMerkleTree() {
+    public String calculateMerkleTree() {
         if (this.transactions == null || this.transactions.isEmpty()) {
             return "";
         }
@@ -159,7 +162,7 @@ public class Block {
             for (int i = 0; i < currentLayer.size(); i += 2) {
                 String left = currentLayer.get(i);
                 String right = (i + 1 < currentLayer.size()) ? currentLayer.get(i + 1) : left;
-                String combinedHash = Util.getInstance().applySha256(left + right);
+                String combinedHash = sha256(left + right);
                 nextLayer.add(combinedHash);
             }
 

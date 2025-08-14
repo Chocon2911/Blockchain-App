@@ -139,7 +139,7 @@ public class PeerService {
         }
     }
 
-// thêm hàm này
+    // thêm hàm này
     public static void removeIpFromLocalFile(String ipToRemove) {
         try {
             List<String> ipList = getLocalIpAddresses();
@@ -264,7 +264,6 @@ public class PeerService {
 
 
     //=========================================Broadcast==========================================
-    // Gửi Block dưới dạng JSON tới tối đa 8 node(mới)
     public static void broadcastBlock(Block block) {
         if (block == null) {
             System.out.println("[broadcastBlock] Block null, bỏ qua.");
@@ -296,19 +295,20 @@ public class PeerService {
             }
         }
 
-        // // Bổ sung từ danh sách global nếu chưa đủ 8
-        // List<String> globalIpAddresses = getGlobalIpAddresses();
-        // for (String address : globalIpAddresses) {
-        //     if (ipAddresses.contains(address)) continue;
+         // Bổ sung từ danh sách global nếu chưa đủ 8
+         List<String> globalIpAddresses = getGlobalIpAddresses();
+         for (String address : globalIpAddresses) {
+             if (ipAddresses.contains(address)) continue;
 
-        //     boolean connected = sendJsonToIp(address, blockJson);
-        //     if (connected) {
-        //         connectedCount++;
-        //         addIpToLocalFile(address);
-        //     }
+             boolean connected = sendJsonToIp(address, blockJson);
+             if (connected) {
+                 connectedCount++;
+                 addIpToLocalFile(address);
+             }
 
-        //     if (connectedCount >= 8) break;
-        // }
+             if (connectedCount >= 8) break;
+         }
+
 
     System.out.println("[broadcastBlock] Done. Successful peers: " + connectedCount);
     }
@@ -373,11 +373,6 @@ public class PeerService {
     public static void listen4NewBlock() throws IOException {
         ServerSocket serverSocket = new ServerSocket(port);
         ExecutorService threadPool = Executors.newCachedThreadPool();
-    }
-
-    private static void listenOnPort(int port) {
-        // Giữ lại để tương thích cũ; khuyến nghị dùng ListenOnPort
-        ListenOnPort(port);
     }
 
     // Lắng nghe tối đa 117 kết nối, nhận JSON -> Block, xác thực, nếu hợp lệ thì lan truyền tiếp
@@ -445,7 +440,7 @@ public class PeerService {
 
     //================================== New JSON Print Listener (Add-On) ================================
     // Không ghi đè hàm cũ; thêm hàm mới để lắng nghe và in JSON
-    public static void listenAndPrintJsonOnPort(int p) {
+    public static void listenForBlock(int p) {
         try (ServerSocket serverSocket = new ServerSocket(p)) {
             System.out.println("JSON print listener running on port " + p + "...");
             while (true) {
@@ -473,11 +468,6 @@ public class PeerService {
         } catch (IOException e) {
             System.out.println("[listenAndPrintJsonOnPort] Can't open port: " + e.getMessage());
         }
-    }
-
-    // Tiện ích: dùng port mặc định
-    public static void listenAndPrintJson() {
-        listenAndPrintJsonOnPort(port);
     }
 
     //===================================== Local JSON/File Utils =====================================
@@ -610,11 +600,6 @@ public class PeerService {
         return false;
     }
 }
-
-//========================================Local JSON Utils========================================
-class JsonLiteUtils {
-}
-
 
 
     
