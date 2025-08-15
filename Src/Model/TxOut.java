@@ -12,16 +12,16 @@ public class TxOut {
         this.value = value;
         this.publicAdd = publicAdd;
     }
+
     public long getValue() {
         return value;
     }
-
     public String getPublicAdd() {
         return publicAdd;
     }
+
     @Override
     public String toString() {
         return "TxOut{value=" + value + ", to=" + publicAdd + "}";
     }
-
 }

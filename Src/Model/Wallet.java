@@ -10,8 +10,8 @@ import org.bouncycastle.jce.ECNamedCurveTable;
 import org.bouncycastle.jce.spec.ECParameterSpec;
 
 public class Wallet {
-    private byte[] privateKey;
-    private static byte[] publicKey;
+    private PrivateKey privateKey;
+    private PublicKey publicKey;
     static {
         Security.addProvider(new BouncyCastleProvider());
     }
@@ -26,21 +26,18 @@ public class Wallet {
         ECGenParameterSpec ecSpec = new ECGenParameterSpec("secp256k1");
         keyGen.initialize(ecSpec, new SecureRandom());
         KeyPair keyPair = keyGen.generateKeyPair();
-        this.privateKey = keyPair.getPrivate().getEncoded();
-        this.publicKey = keyPair.getPublic().getEncoded();
+        privateKey = keyPair.getPrivate();
+        publicKey = keyPair.getPublic();
     }
 
-    public byte[] getPublicKey() {
+    public PrivateKey getPrivateKey() { return privateKey; }
+    public PublicKey getPublicKey() {
         return publicKey;
     }
 
     public byte[] sign(byte[] data) throws Exception {
-        ECParameterSpec ecSpec = ECNamedCurveTable.getParameterSpec("secp256k1");
-        ECPrivateKeySpec privKeySpec = new ECPrivateKeySpec(new java.math.BigInteger(1, privateKey), ecSpec);
-
         Signature ecdsaSign = Signature.getInstance("SHA256withECDSA", "BC");
-        KeyFactory kf = KeyFactory.getInstance("ECDSA", "BC");
-        ecdsaSign.initSign(kf.generatePrivate(privateKey));
+        ecdsaSign.initSign(privateKey);
         ecdsaSign.update(data);
         return ecdsaSign.sign();
     }

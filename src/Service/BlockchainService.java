@@ -1,6 +1,7 @@
 package Service;
 
 import Model.Block;
+import Model.Transaction;
 import com.google.gson.Gson;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.Options;
@@ -8,15 +9,18 @@ import org.iq80.leveldb.Options;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
 
 import static org.fusesource.leveldbjni.JniDBFactory.*;
 
 public class BlockchainService {
     //==========================================Variable==========================================
     private static final String filePath = "Db/blockchaind.db";
-    private static final DB db;
+    public static final String version = "0.0.1";
+    private static DB db;
     static {
         try {
             Options options = new Options();
@@ -27,7 +31,7 @@ public class BlockchainService {
         }
     }
 
-    //===========================================Method===========================================
+    //=========================================Db Handler=========================================
     public static int getBlockCount() {
         File jsonFile = new File("Db/BlockCount.json");
 
@@ -64,6 +68,21 @@ public class BlockchainService {
         }
     }
 
+    public static void decreaseBlockCount() {
+        File jsonFile = new File("Db/BlockCount.json");
+
+        try {
+            int currentCount = getBlockCount();
+            if (currentCount == -1) return;
+
+            FileWriter writer = new FileWriter(jsonFile, false);
+            writer.write(String.valueOf(currentCount - 1));
+            writer.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     public static Block getBlock(int index) {
         String key = indexToKey(index);
         byte[] value = db.get(bytes(key));
@@ -72,18 +91,116 @@ public class BlockchainService {
         return getBlockFromJson(asString(value));
     }
 
+    public static Block getLastBlock() {
+        return getBlock(getBlockCount() - 1);
+    }
+
     public static void addBlock(Block block) {
         try {
-            int index = getBlockCount();
-            String key = indexToKey(index);
-            String json = new Gson().toJson(block);
-            db.put(bytes(key), bytes(json));
+            addBlockDB(block);
             increaseBlockCount();
         } catch (Exception e) {
-            System.err.println("Lỗi khi thêm block: " + e.getMessage());
+            System.err.println("Error adding block: " + e.getMessage());
         }
     }
 
+    public static Block createNewBlock(List<Transaction> transactions) {
+        Block block = BlockchainService.getBlock(BlockchainService.getBlockCount() - 1);
+        int index = block.getIndex() + 1;
+        String previousHash = block.getHash();
+        BigInteger previousNChainWork = block.getNChainWork();
+        int difficulty = block.getDifficulty();
+
+        Block newBlock = new Block(index, version, previousHash, previousNChainWork, difficulty, transactions);
+        return newBlock;
+    }
+
+    public static void removeBlock() {
+        int index = getBlockCount() - 1;
+        String key = indexToKey(index);
+        db.delete(bytes(key));
+        decreaseBlockCount();
+    }
+
+    //=======================================Block Verifier=======================================
+    public static boolean examineBlock(Block block, String senderAddress) {
+        Block lastBlock = getLastBlock();
+
+        // 1. Examine index
+        if (block.getIndex() != lastBlock.getIndex() + 1) {
+            if (block.getIndex() > lastBlock.getIndex() + 1) {
+                PeerService.broadcastBlockLocator(senderAddress);
+            }
+
+            System.out.println("Invalid index");
+            return false;
+        }
+
+        // 2. Verify previous hash with curr block
+        if (!block.getPreviousHash().equals(lastBlock.getHash())) {
+            System.out.println("Previous hash mismatch");
+            return false;
+        }
+
+        // 3. Check merkle root
+        String expectedMerkle = block.calculateMerkleTree();
+        List<Transaction> txs = block.getTransactions();
+        if (!expectedMerkle.equals(block.calculateMerkleTree())) {
+            System.out.println("Merkle root mismatch");
+            return false;
+        }
+
+        // 4. Verify timestamp (not earlier than last block and not too far in the future)
+        long now = System.currentTimeMillis() / 1000L;
+        if (block.getTimestamp() <= lastBlock.getTimestamp()) {
+            System.out.println("Invalid timestamp (too early)");
+            return false;
+        }
+        if (block.getTimestamp() > now + 2 * 60 * 60) {
+            System.out.println("Invalid timestamp (too far in future)");
+            return false;
+        }
+
+        // 5. Check difficulty and hash
+        BigInteger target = new BigInteger(block.getHash(), 16);
+        if (target.compareTo(block.getTarget()) > 0) {
+            System.out.println("Hash does not meet difficulty target");
+            return false;
+        }
+
+        // 6. Verify NChainWork
+        if (!block.getNChainWork().equals(lastBlock.getNChainWork().add(
+                BigInteger.ONE.shiftLeft(256).divide(block.getTarget().add(BigInteger.ONE))))) {
+            System.out.println("Invalid chain work");
+            return false;
+        }
+
+        // 7. Check transactions
+        if (txs.isEmpty()) {
+            System.out.println("No transactions");
+            return false;
+        }
+
+        if (!txs.get(0).isCoinbase()) {
+            System.out.println("Invalid coinbase transaction");
+            return false;
+        }
+        for (int i = 1; i < txs.size(); i++) {
+            try {
+                if (!TransactionService.validateTransaction(txs.get(i))) {
+                    System.out.println("Invalid transaction found");
+                    return false;
+                }
+            } catch (Exception e) {
+                System.err.println("Error validating transaction: " + e.getMessage());
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    //============================================Json============================================
     public static Block getBlockFromJson(String json) {
         return new Gson().fromJson(json, Block.class);
     }
@@ -94,5 +211,29 @@ public class BlockchainService {
 
     private static String indexToKey(int index) {
         return String.format("%06d", index);
+    }
+
+    //=============================================Db=============================================
+    public static void initDB() throws IOException {
+        Options options = new Options();
+        options.createIfMissing(true);
+        db = factory.open(new File(filePath), options);
+    }
+
+    public static void closeDB() throws IOException {
+        db.close();
+    }
+
+    public static void addBlockDB(Block block) {
+        String key = String.valueOf(block.getIndex());
+        String json = getJsonFromBlock(block);
+        db.put(bytes(key), bytes(json));
+    }
+
+    public static Block getBlockDB(int index) {
+        String key = String.valueOf(index);
+        byte[] data = db.get(bytes(key));
+        if (data == null) return null;
+        return getBlockFromJson(asString(data));
     }
 }

@@ -2,6 +2,7 @@ package Model;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,6 +16,10 @@ public class Transaction {
     public long locktime;
     public long timestamp;
 
+    public Transaction(int version, PrivateKey privateKeySender, PublicKey publicKeySender,
+                       String publicAddressReceiver, long amount, long fee) {
+
+    }
 
     public Transaction(int version, List<TxIn> inputs, List<TxOut> outputs) {
         this.version = version;
@@ -89,25 +94,23 @@ public class Transaction {
         }
     }
 
-
     public String getHash() {
-            try {
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        StringBuilder rawData = new StringBuilder();
-        for (TxIn in : inputs) {
-            rawData.append(in.prevTxId).append(in.outputIndex);
-        }
-        for (TxOut out : outputs) {
-            rawData.append(out.getValue()).append(out.getPublicAdd());
-        }
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            StringBuilder rawData = new StringBuilder();
+            for (TxIn in : inputs) {
+                rawData.append(in.prevTxId).append(in.outputIndex);
+            }
+            for (TxOut out : outputs) {
+                rawData.append(out.getValue()).append(out.getPublicAdd());
+            }
 
-        byte[] hash = digest.digest(rawData.toString().getBytes());
-        return bytesToHex(hash);
-    }catch (Exception e) {
-        e.printStackTrace();
-        return "";
-    }
-
+            byte[] hash = digest.digest(rawData.toString().getBytes());
+            return bytesToHex(hash);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "";
+        }
     }
 
     private String bytesToHex(byte[] bytes) {
