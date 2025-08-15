@@ -2,6 +2,7 @@ package Model;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,6 +16,10 @@ public class Transaction {
     public long locktime;
     public long timestamp;
 
+    public Transaction(int version, PrivateKey privateKeySender, PublicKey publicKeySender,
+                       String publicAddressReceiver, long amount, long fee) {
+
+    }
 
     public Transaction(int version, List<TxIn> inputs, List<TxOut> outputs) {
         this.version = version;

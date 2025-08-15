@@ -1,8 +1,12 @@
 package Service;
 
-import Data.CreateWallet.CreateWalletAppData;
-import Data.CreateWallet.CreateWalletServiceData;
+import Data.App.CreateTranasactionAppData;
+import Data.App.CreateWalletAppData;
+import Data.Service.CreateTrasactionServiceData;
+import Data.Service.CreateWalletServiceData;
+import Model.Transaction;
 import Model.Wallet;
+import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -16,6 +20,7 @@ public class AppConnectorService {
     //==========================================Variable==========================================
     private static final int appPort = 2025;
     private static final String appAddress = "127.0.0.1";
+    private static Gson gson = new Gson();
 
     //============================================App=============================================
     public static void handleClient(Socket socket) {
@@ -93,11 +98,38 @@ public class AppConnectorService {
     }
 
     //=====================================Create Transaction=====================================
+    private static String createTransaction(CreateTranasactionAppData data) {
+        try {
+            String publicAddressSender = TransactionService.getPublicAddress(data.getPublicKeySenderAdapter());
+            long balance = UTXOSet.getBalance(publicAddressSender);
+            if (balance < data.getAmount() + data.getFee()) {
+                return gson.toJson(new CreateTrasactionServiceData("Insufficient balance"));
+            }
+
+            if (data.getFee() < 0) {
+                return gson.toJson(new CreateTrasactionServiceData("Invalid fee"));
+            }
+
+            Transaction tx = new Transaction(data.getPublicAddressReceiver(), data.getAmount(), data.getPublicKeySenderAdapter(), data.getPrivateKeySenderAdapter());
+        } catch (Exception e) {
+            System.out.println("ERROR creating transaction");
+            e.printStackTrace();
+        }
+        return null;
+    }
 
     //=======================================Check Balance========================================
+    private static String checkBalance() {
+
+    }
 
     //===========================================Mining===========================================
+    private static String mining() {
+
+    }
 
     //========================================Create Block========================================
+    private static String createBlock() {
 
+    }
 }

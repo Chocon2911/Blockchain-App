@@ -1,4 +1,4 @@
-package Data.CheckBalance;
+package Data.App;
 
 public class CheckBalanceAppData {
 }

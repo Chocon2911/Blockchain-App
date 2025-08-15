@@ -1,4 +1,4 @@
-package Data.CreateWallet;
+package Data.Service;
 
 import Data.Constrcutor.ServiceData;
 import Model.Wallet;

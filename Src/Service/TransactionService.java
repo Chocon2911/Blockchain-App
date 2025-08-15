@@ -8,10 +8,15 @@ import com.google.gson.Gson;
 
 import java.io.IOException;
 import java.security.KeyFactory;
+import java.security.MessageDigest;
+import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 
 import com.google.gson.*;
+import org.bitcoinj.core.Base58;
+
 import java.util.Base64;
 
 
@@ -212,4 +217,68 @@ public class TransactionService {
         return gson.toJson(txOut);
     }
 
+    //==========================================Support===========================================
+    public static String getPublicAddress(PublicKey publicKey) {
+        try {
+            byte[] pubKeyBytes = publicKey.getEncoded();
+
+            // SHA-256
+            MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+            byte[] shaHashed = sha256.digest(pubKeyBytes);
+
+            // RIPEMD-160
+            MessageDigest ripemd160 = MessageDigest.getInstance("RIPEMD160", "BC");
+            byte[] ripemdHashed = ripemd160.digest(shaHashed);
+
+            // Thêm version byte (0x00)
+            byte[] versioned = new byte[ripemdHashed.length + 1];
+            versioned[0] = 0x00;
+            System.arraycopy(ripemdHashed, 0, versioned, 1, ripemdHashed.length);
+
+            // Checksum
+            byte[] checksum = sha256.digest(sha256.digest(versioned));
+            byte[] addressBytes = new byte[versioned.length + 4];
+            System.arraycopy(versioned, 0, addressBytes, 0, versioned.length);
+            System.arraycopy(checksum, 0, addressBytes, versioned.length, 4);
+
+            return Base58.encode(addressBytes);
+        } catch (Exception e) {
+            System.out.println("ERROR getting public address");
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static PublicKey getPublicKey(String publicKey) {
+        if (publicKey == null) {
+            System.out.println("ERROR public key is null");
+            return null;
+        }
+
+        try {
+            byte[] bytes = Base64.getDecoder().decode(publicKey);
+            KeyFactory keyFactory = KeyFactory.getInstance("EC"); // Hoặc "RSA" nếu baise dùng RSA
+            X509EncodedKeySpec spec = new X509EncodedKeySpec(bytes);
+            return keyFactory.generatePublic(spec);
+        } catch (Exception e) {
+            System.out.println("ERROR getting public key");
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static PrivateKey getPrivateKey(String privateKey) {
+        if (privateKey == null) {
+            System.out.println("ERROR private key is null");
+            return null;
+        }
+
+        try {
+            byte[] bytes = Base64.getDecoder().decode(privateKey);
+            KeyFactory keyFactory = KeyFactory.getInstance("EC"); // Hoặc "RSA" nếu baise dùng RSA
+            PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(bytes);
+            return keyFactory.generatePrivate(spec);
+        } catch (Exception e) {
+            System.out.println("ERROR getting private key");
+            throw new RuntimeException(e);
+        }
+    }
 }

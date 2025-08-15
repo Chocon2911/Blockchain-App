@@ -1,4 +1,4 @@
-package Data.Mining;
+package Data.App;
 
 public class MiningAppData {
 }

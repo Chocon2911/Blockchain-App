@@ -1,4 +1,4 @@
-package Data.CreateWallet;
+package Data.App;
 
 import Data.Constrcutor.AppData;
 import com.google.gson.JsonObject;
