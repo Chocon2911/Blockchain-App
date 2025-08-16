@@ -1,6 +1,7 @@
 package Model;
 
-import java.nio.charset.StandardCharsets;
+import Service.UTXOSet;
+
 import java.security.MessageDigest;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -10,27 +11,62 @@ import java.util.Date;
 import java.util.List;
 
 public class Transaction {
-    public int version;
+    public String version;
     public List<TxIn> inputs;
     public List<TxOut> outputs;
+    public List<UTXO> utxos;
     public long locktime;
     public long timestamp;
+    public String hash;
 
-    public Transaction(int version, PrivateKey privateKeySender, PublicKey publicKeySender,
+    public Transaction(PrivateKey privateKeySender, PublicKey publicKeySender,
                        String publicAddressReceiver, long amount, long fee) {
+        this.version = "0.0.1";
+        this.inputs = new ArrayList<>();
+        this.outputs = new ArrayList<>();
 
-    }
+        // Lấy UTXO của người gửi, KHÔNG phải receiver
+        Wallet wallet = new Wallet(privateKeySender, publicKeySender);
+        List<UTXO> senderUtxos = UTXOSet.getUTXOsByPubAdd(wallet.getAddress());
 
-    public Transaction(int version, List<TxIn> inputs, List<TxOut> outputs) {
-        this.version = version;
-        this.inputs = inputs;
-        this.outputs = outputs;
+        long totalInput = 0;
+        long required = amount + fee;
+
+        // Chọn UTXO cho đến khi đủ amount + fee
+        for (UTXO utxo : senderUtxos) {
+            if (utxo.getIsLocked()) continue; // skip UTXO đã bị lock
+
+            // Lock UTXO khi được sử dụng
+            utxo.setIsLocked(true);
+            UTXOSet.addUTXO(utxo);
+
+            inputs.add(new TxIn(utxo.getTxId(), utxo.getIndex(), publicKeySender));
+            totalInput += utxo.getValue();
+
+            if (totalInput >= required) break;
+        }
+
+        if (totalInput < required) {
+            throw new RuntimeException("Insufficient balance to cover amount + fee");
+        }
+
+        // Output cho receiver
+        outputs.add(new TxOut(amount, publicAddressReceiver));
+
+        // Nếu còn dư thì trả lại cho sender (change)
+        long change = totalInput - amount - fee;
+        if (change > 0) {
+            this.utxos.add(new UTXO(1, change, wallet.getAddress(), true));
+        }
+
         this.timestamp = new Date().getTime();
-        this.locktime = this.timestamp + 300000;
+
+        // Tạo hash cho transaction (giản lược, tuỳ bạn có SHA-256 hay double SHA-256)
+        this.hash = getTxId();
     }
 
     public Transaction(String pubAdd, long reward, PublicKey pubKey, Wallet wallet) {
-        this.version = 1;
+        this.version = "0.0.1";
         this.inputs = new ArrayList<>();
         this.outputs = new ArrayList<>();
         this.timestamp = new Date().getTime();
@@ -43,7 +79,7 @@ public class Transaction {
         // Ở coinbase tx, scriptSig là dữ liệu tùy ý (extra nonce, thông điệp miner)
         TxIn coinbaseIn = new TxIn(zeroPrevTxId, voutIndex, pubKey);
         try {
-            byte[] signature = wallet.sign(this.getHash().getBytes());
+            byte[] signature = wallet.sign(this.calculateHash().getBytes());
             coinbaseIn.setSignature(signature);
             this.inputs.add(coinbaseIn);
         } catch (Exception e) {
@@ -55,7 +91,6 @@ public class Transaction {
         TxOut rewardOut = new TxOut(reward, pubAdd);
         this.outputs.add(rewardOut);
     }
-
 
     public void addInput(TxIn in) {
         inputs.add(in);
@@ -94,7 +129,7 @@ public class Transaction {
         }
     }
 
-    public String getHash() {
+    public String calculateHash() {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             StringBuilder rawData = new StringBuilder();
