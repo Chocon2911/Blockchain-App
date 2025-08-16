@@ -170,7 +170,7 @@ public class Block {
 
         List<String> currentLayer = new ArrayList<>();
         for (Transaction tx : this.transactions) {
-            currentLayer.add(tx.getHash());
+            currentLayer.add(tx.calculateHash());
         }
 
         while (currentLayer.size() > 1) {

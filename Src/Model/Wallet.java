@@ -21,6 +21,11 @@ public class Wallet {
         generateKeyPair();
     }
 
+    public Wallet(PrivateKey privateKey, PublicKey publicKey) {
+        this.privateKey = privateKey;
+        this.publicKey = publicKey;
+    }
+
     private void generateKeyPair() throws Exception {
         KeyPairGenerator keyGen = KeyPairGenerator.getInstance("EC", "BC");
         ECGenParameterSpec ecSpec = new ECGenParameterSpec("secp256k1");
@@ -42,32 +47,33 @@ public class Wallet {
         return ecdsaSign.sign();
     }
 
-    public String getAddress() throws Exception {
-        byte[] pubKeyBytes = publicKey.getEncoded();
+    public String getAddress() {
+        try {
+            byte[] pubKeyBytes = publicKey.getEncoded();
 
-        // SHA-256
-        MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
-        byte[] shaHashed = sha256.digest(pubKeyBytes);
+            // SHA-256
+            MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+            byte[] shaHashed = sha256.digest(pubKeyBytes);
 
-        // RIPEMD-160
-        MessageDigest ripemd160 = MessageDigest.getInstance("RIPEMD160", "BC");
-        byte[] ripemdHashed = ripemd160.digest(shaHashed);
+            // RIPEMD-160
+            MessageDigest ripemd160 = MessageDigest.getInstance("RIPEMD160", "BC");
+            byte[] ripemdHashed = ripemd160.digest(shaHashed);
 
-        // Thêm version byte (0x00)
-        byte[] versioned = new byte[ripemdHashed.length + 1];
-        versioned[0] = 0x00;
-        System.arraycopy(ripemdHashed, 0, versioned, 1, ripemdHashed.length);
+            // Thêm version byte (0x00)
+            byte[] versioned = new byte[ripemdHashed.length + 1];
+            versioned[0] = 0x00;
+            System.arraycopy(ripemdHashed, 0, versioned, 1, ripemdHashed.length);
 
-        // Checksum
-        byte[] checksum = sha256.digest(sha256.digest(versioned));
-        byte[] addressBytes = new byte[versioned.length + 4];
-        System.arraycopy(versioned, 0, addressBytes, 0, versioned.length);
-        System.arraycopy(checksum, 0, addressBytes, versioned.length, 4);
+            // Checksum
+            byte[] checksum = sha256.digest(sha256.digest(versioned));
+            byte[] addressBytes = new byte[versioned.length + 4];
+            System.arraycopy(versioned, 0, addressBytes, 0, versioned.length);
+            System.arraycopy(checksum, 0, addressBytes, versioned.length, 4);
 
-        return Base58.encode(addressBytes);
+            return Base58.encode(addressBytes);
+        } catch (Exception e) {
+            System.out.println("ERROR getting public address");
+            throw new RuntimeException(e);
+        }
     }
-
-
-
-
 }

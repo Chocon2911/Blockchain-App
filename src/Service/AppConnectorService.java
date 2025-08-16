@@ -1,8 +1,11 @@
 package Service;
 
+import Data.App.CheckBalanceAppData;
+import Data.App.CreateBlockAppData;
 import Data.App.CreateTranasactionAppData;
 import Data.App.CreateWalletAppData;
-import Data.Service.CreateTrasactionServiceData;
+import Data.Service.NotificationServiceData;
+import Data.Service.CheckBalanceServiceData;
 import Data.Service.CreateWalletServiceData;
 import Model.Transaction;
 import Model.Wallet;
@@ -33,51 +36,36 @@ public class AppConnectorService {
                 JsonObject request = JsonParser.parseString(command).getAsJsonObject();
                 String action = request.get("action").getAsString();
 
-                JsonObject response = new JsonObject();
+                String response = "";
 
                 switch (action) {
                     case "create_wallet":
-                        CreateWalletAppData data = new CreateWalletAppData(request);
-                        createWallet(data);
-
-                        response.addProperty("status", "success");
-
-                        JsonObject wallet = new JsonObject();
-                        wallet.addProperty("public_key", "PUB123456");
-                        wallet.addProperty("private_key", "PRIV654321");
-
-                        response.add("wallet", wallet);
-                        break;
-
-                    case "mining":
-                        response.addProperty("status", "success");
-                        response.addProperty("message", "Mining completed");
+                        CreateWalletAppData createWalletData = new CreateWalletAppData(request);
+                        response = createWallet(createWalletData);
                         break;
 
                     case "create_transaction":
-                        String from = request.get("from").getAsString();
-                        String to = request.get("to").getAsString();
-                        double amount = request.get("amount").getAsDouble();
-                        // Giả lập xử lý giao dịch
-                        response.addProperty("status", "success");
-                        response.addProperty("tx_id", "TX999999");
+                        CreateTranasactionAppData createTransactionData = new CreateTranasactionAppData(request);
+                        response = createTransaction(createTransactionData);
                         break;
 
                     case "check_balance":
-                        String publicKey = request.get("public_key").getAsString();
-                        // Giả lập dữ liệu số dư
-                        response.addProperty("status", "success");
-                        response.addProperty("balance", 1000.5);
+                        CheckBalanceAppData checkBalanceData = new CheckBalanceAppData(request);
+                        response = checkBalance(checkBalanceData);
                         break;
                     case "create_block":
-                        String previousHash = request.get("previous_hash").getAsString();
+                        CreateBlockAppData createBlockData = new CreateBlockAppData(request);
+                        response = createBlock(createBlockData);
+                        break;
+                    case "get_processor_amount":
+                        break;
+                    case "turn_off":
+
                     default:
-                        response.addProperty("status", "error");
-                        response.addProperty("message", "Unknown action");
+                        response = gson.toJson(new NotificationServiceData("error", "Invalid action"));
                 }
 
-                // Trả về JSON dạng String
-                out.println(response.toString());
+                out.println(response);
             }
 
         } catch (IOException e) {
@@ -103,33 +91,48 @@ public class AppConnectorService {
             String publicAddressSender = TransactionService.getPublicAddress(data.getPublicKeySenderAdapter());
             long balance = UTXOSet.getBalance(publicAddressSender);
             if (balance < data.getAmount() + data.getFee()) {
-                return gson.toJson(new CreateTrasactionServiceData("Insufficient balance"));
+                return gson.toJson(new NotificationServiceData("create_transaction", "Insufficient balance"));
             }
 
             if (data.getFee() < 0) {
-                return gson.toJson(new CreateTrasactionServiceData("Invalid fee"));
+                return gson.toJson(new NotificationServiceData("create_transaction", "Invalid fee"));
             }
 
-            Transaction tx = new Transaction(data.getPublicAddressReceiver(), data.getAmount(), data.getPublicKeySenderAdapter(), data.getPrivateKeySenderAdapter());
+            Transaction tx = new Transaction(data.getPrivateKeySenderAdapter(),
+                    data.getPublicKeySenderAdapter(), data.getPublicAddressReceiver(),
+                    data.getAmount(), data.getFee());
+            return gson.toJson(new NotificationServiceData("create_transaction", "Success"));
         } catch (Exception e) {
             System.out.println("ERROR creating transaction");
+            e.printStackTrace();
+        }
+
+        return null;
+    }
+
+    //=======================================Check Balance========================================
+    private static String checkBalance(CheckBalanceAppData data) {
+        try {
+            if (data.getPublicAddress() == null) {
+                return gson.toJson(new NotificationServiceData("check_balance", "Invalid public address"));
+            }
+            long balance = UTXOSet.getBalance(data.getPublicAddress());
+            if (UTXOSet.getBalance(data.getPublicAddress()) < 0) {
+                return gson.toJson(new NotificationServiceData("check_balance", "Invalid public address"));
+            }
+            return gson.toJson(new CheckBalanceServiceData(balance));
+        } catch (Exception e) {
+            System.out.println("ERROR checking balance");
             e.printStackTrace();
         }
         return null;
     }
 
-    //=======================================Check Balance========================================
-    private static String checkBalance() {
-
-    }
-
-    //===========================================Mining===========================================
-    private static String mining() {
-
-    }
-
     //========================================Create Block========================================
-    private static String createBlock() {
-
+    private static String createBlock(CreateBlockAppData data) {
+        if (data.getThreadAmount() <= 0 || data.getThreadAmount() > ComputerService.getProcessorCount() - 1) {
+            return gson.toJson(new NotificationServiceData("create_block", "Invalid thread amount"));
+        }
+        return gson.toJson(new NotificationServiceData("create_block", "Success"));
     }
 }

@@ -2,6 +2,8 @@ package Service;
 
 import Model.Block;
 import Model.Transaction;
+import Model.TxOut;
+import Model.UTXO;
 
 import java.math.BigInteger;
 import java.util.List;
@@ -40,6 +42,9 @@ public class MinerService {
             count++;
 
             if (!isFound.get()) continue;
+            for (Transaction tx : block.getTransactions()) {
+                UTXOSet.updateWithTransaction(tx);
+            }
             BlockchainService.addBlock(block);
             PeerService.broadcastBlock(block);
         }

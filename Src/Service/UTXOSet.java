@@ -48,6 +48,7 @@ import static org.iq80.leveldb.impl.Iq80DBFactory.*;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 
 import com.google.gson.Gson;
@@ -57,10 +58,14 @@ public class UTXOSet {
     private static final Gson gson = new Gson();
     private static final String dbPath = "Db/UTXOSet.db";
 
-    public static void initDB() throws IOException {
-        Options options = new Options();
-        options.createIfMissing(true);
-        db = factory.open(new File(dbPath), options);
+    static {
+        try {
+            Options options = new Options();
+            options.createIfMissing(true);
+            db = factory.open(new File(dbPath), options);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     private static String makeKey(String txId, int index) {
@@ -74,6 +79,22 @@ public class UTXOSet {
         return gson.fromJson(json, UTXO.class);
     }
 
+    public static List<UTXO> getUTXOsByPubAdd(String pubAdd) {
+        List<UTXO> utxos = new java.util.ArrayList<>();
+        try (DBIterator iterator = db.iterator()) {
+            for (iterator.seekToFirst(); iterator.hasNext(); iterator.next()) {
+                String json = new String(iterator.peekNext().getValue(), StandardCharsets.UTF_8);
+                UTXO utxo = gson.fromJson(json, UTXO.class);
+                if (utxo.getPubAdd().equals(pubAdd)) {
+                    utxos.add(utxo);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return utxos;
+    }
+
     public static void addUTXO(UTXO utxo) {
         String key = makeKey(utxo.getTxId(), utxo.getIndex());
         String json = gson.toJson(utxo);
@@ -85,7 +106,7 @@ public class UTXOSet {
     }
 
     public static long getBalance(String pubAdd) {
-        long total = 0;
+        long total = -1;
         try (DBIterator iterator = db.iterator()) {
             for (iterator.seekToFirst(); iterator.hasNext(); iterator.next()) {
                 String json = new String(iterator.peekNext().getValue(), StandardCharsets.UTF_8);
@@ -109,7 +130,11 @@ public class UTXOSet {
         // Thêm UTXO mới
         for (int i = 0; i < tx.getOutputs().size(); i++) {
             TxOut out = tx.getOutputs().get(i);
-            addUTXO(new UTXO(tx.getTxId(), i, out.getValue(), out.getPublicAdd()));
+            addUTXO(new UTXO(tx.getTxId(), i, out.getValue(), out.getPublicAdd(), false));
+        }
+
+        for (int i = 0; i < tx.utxos.size(); i++) {
+            addUTXO(tx.utxos.get(i));
         }
     }
 

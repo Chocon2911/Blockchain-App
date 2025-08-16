@@ -9,8 +9,8 @@ public class TxIn {
     public byte[] scriptSig; // Chữ ký (giả lập)
     public PublicKey pubKey;
 
-    public TxIn(String txid, int outputIndex, PublicKey pubKey) {
-        this.prevTxId = txid;
+    public TxIn(String txId, int outputIndex, PublicKey pubKey) {
+        this.prevTxId = txId;
         this.outputIndex = outputIndex;
         this.pubKey = pubKey;
         this.scriptSig = null;

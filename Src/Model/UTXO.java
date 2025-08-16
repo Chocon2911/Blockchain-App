@@ -7,12 +7,21 @@ public class UTXO {
     private int index;         // Vị trí của output trong transaction
     private long value;      // Giá trị coin
     private String pubAdd; // Chủ sở hữu
+    private boolean isLocked;
 
-    public UTXO(String txId, int index, long value, String pubAdd) {
+    public UTXO(int index, long value, String pubAddress, boolean isLocked) {
+        this.index = index;
+        this.value = value;
+        this.pubAdd = pubAddress;
+        this.isLocked = isLocked;
+    }
+
+    public UTXO(String txId, int index, long value, String pubAdd, boolean isLocked) {
         this.txId = txId;
         this.index = index;
         this.value = value;
         this.pubAdd = pubAdd;
+        this.isLocked = isLocked;
     }
 
 
@@ -29,9 +38,12 @@ public class UTXO {
         return value;
     }
 
-    public String getPubAdd() {
-        return pubAdd;
-    }
+    public String getPubAdd() { return pubAdd; }
+
+    public boolean getIsLocked() { return isLocked; }
+
+    public void setIsLocked(boolean isLocked) { this.isLocked = isLocked; }
+    public void setTxId(String txId) { this.txId = txId; }
 
     @Override
     public String toString() {
