@@ -1,10 +1,15 @@
 package Main;
 
-import UI.MainUI;
+import Service.AppConnectorService;
+import Service.BlockchainService;
+import Service.TransactionService;
+import Service.UTXOSet;
 
 public class App {
     public static void main(String[] args) {
-        MainUI mainUI = new MainUI();
-        mainUI.display();
+        new BlockchainService();
+        new TransactionService();
+        new UTXOSet();
+        AppConnectorService.handleClient();
     }
 }

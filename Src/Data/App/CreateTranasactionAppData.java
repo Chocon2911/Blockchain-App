@@ -12,8 +12,8 @@ public class CreateTranasactionAppData extends AppData {
     private String privateKeySender;
     private String publicKeySender;
     private String publicAddressReceiver;
-    private int amount;
-    private int fee;
+    private long amount;
+    private long fee;
 
     //========================================Constructor=========================================
     public CreateTranasactionAppData(JsonObject data) {
@@ -21,16 +21,16 @@ public class CreateTranasactionAppData extends AppData {
         this.privateKeySender = data.get("privateKeySender").getAsString();
         this.publicKeySender = data.get("publicKeySender").getAsString();
         this.publicAddressReceiver = data.get("publicAddressReceiver").getAsString();
-        this.amount = data.get("amount").getAsInt();
-        this.fee = data.get("fee").getAsInt();
+        this.amount = data.get("amount").getAsLong();
+        this.fee = data.get("fee").getAsLong();
     }
 
     //==========================================Get Set===========================================
     public String getPrivateKeySender() { return privateKeySender; }
     public String getPublicKeySender() { return publicKeySender; }
     public String getPublicAddressReceiver() { return publicAddressReceiver; }
-    public int getAmount() { return amount; }
-    public int getFee() { return fee; }
+    public long getAmount() { return amount; }
+    public long getFee() { return fee; }
 
     public PublicKey getPublicKeySenderAdapter() { return TransactionService.getPublicKey(publicKeySender); }
     public PrivateKey getPrivateKeySenderAdapter() { return TransactionService.getPrivateKey(privateKeySender); }

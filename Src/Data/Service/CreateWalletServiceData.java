@@ -27,7 +27,7 @@ public class CreateWalletServiceData extends ServiceData {
             try {
                 byte[] decoded = Base64.getDecoder().decode(json.getAsString());
                 java.security.spec.PKCS8EncodedKeySpec keySpec = new java.security.spec.PKCS8EncodedKeySpec(decoded);
-                java.security.KeyFactory keyFactory = java.security.KeyFactory.getInstance("RSA");
+                java.security.KeyFactory keyFactory = java.security.KeyFactory.getInstance("EC"); // 🔥 sửa RSA -> EC
                 return keyFactory.generatePrivate(keySpec);
             } catch (Exception e) {
                 throw new JsonParseException(e);
@@ -47,13 +47,14 @@ public class CreateWalletServiceData extends ServiceData {
             try {
                 byte[] decoded = Base64.getDecoder().decode(json.getAsString());
                 java.security.spec.X509EncodedKeySpec keySpec = new java.security.spec.X509EncodedKeySpec(decoded);
-                java.security.KeyFactory keyFactory = java.security.KeyFactory.getInstance("RSA");
+                java.security.KeyFactory keyFactory = java.security.KeyFactory.getInstance("EC"); // 🔥 sửa RSA -> EC
                 return keyFactory.generatePublic(keySpec);
             } catch (Exception e) {
                 throw new JsonParseException(e);
             }
         }
     }
+
 
     // ===== Define Gson =====
     private static final Gson gson = new GsonBuilder()

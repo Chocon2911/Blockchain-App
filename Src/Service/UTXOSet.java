@@ -43,30 +43,70 @@ import Model.Transaction;
 import Model.TxIn;
 import Model.TxOut;
 import Model.UTXO;
+import com.google.gson.*;
 import org.iq80.leveldb.*;
-import static org.iq80.leveldb.impl.Iq80DBFactory.*;
+
+import static org.fusesource.leveldbjni.JniDBFactory.factory;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.security.KeyFactory;
+import java.security.PublicKey;
+import java.security.spec.X509EncodedKeySpec;
+import java.util.Base64;
 import java.util.List;
-
-
-import com.google.gson.Gson;
+import java.util.Map;
 
 public class UTXOSet {
     private static DB db;
-    private static final Gson gson = new Gson();
     private static final String dbPath = "Db/UTXOSet.db";
-
     static {
         try {
             Options options = new Options();
             options.createIfMissing(true);
             db = factory.open(new File(dbPath), options);
+
+            // In ra tất cả key-value trong DB
+            try (DBIterator iterator = db.iterator()) {
+                iterator.seekToFirst();
+                System.out.println("===== Database Content =====");
+                while (iterator.hasNext()) {
+                    Map.Entry<byte[], byte[]> entry = iterator.next();
+                    String key = new String(entry.getKey(), StandardCharsets.UTF_8);
+                    String value = new String(entry.getValue(), StandardCharsets.UTF_8);
+                    System.out.println(key + " = " + value);
+                }
+                System.out.println("============================");
+            }
+
         } catch (IOException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Can't open database", e);
         }
     }
+
+    public static final Gson gson = new GsonBuilder()
+            // byte[] <-> Base64
+            .registerTypeHierarchyAdapter(byte[].class, (JsonSerializer<byte[]>) (src, typeOfSrc, context) ->
+                    new JsonPrimitive(Base64.getEncoder().encodeToString(src))
+            )
+            .registerTypeHierarchyAdapter(byte[].class, (JsonDeserializer<byte[]>) (json, typeOfT, context) ->
+                    Base64.getDecoder().decode(json.getAsString())
+            )
+            // PublicKey <-> Base64
+            .registerTypeHierarchyAdapter(PublicKey.class, (JsonSerializer<PublicKey>) (src, typeOfSrc, context) ->
+                    new JsonPrimitive(Base64.getEncoder().encodeToString(src.getEncoded()))
+            )
+            .registerTypeHierarchyAdapter(PublicKey.class, (JsonDeserializer<PublicKey>) (json, typeOfT, context) -> {
+                try {
+                    byte[] bytes = Base64.getDecoder().decode(json.getAsString());
+                    KeyFactory keyFactory = KeyFactory.getInstance("EC"); // Hoặc "RSA" nếu bạn dùng RSA
+                    X509EncodedKeySpec spec = new X509EncodedKeySpec(bytes);
+                    return keyFactory.generatePublic(spec);
+                } catch (Exception e) {
+                    throw new JsonParseException(e);
+                }
+            })
+            .create();
 
     private static String makeKey(String txId, int index) {
         return txId + ":" + index;
@@ -80,12 +120,31 @@ public class UTXOSet {
     }
 
     public static List<UTXO> getUTXOsByPubAdd(String pubAdd) {
+        System.out.println("getUTXOsByPubAdd: " + pubAdd);
         List<UTXO> utxos = new java.util.ArrayList<>();
         try (DBIterator iterator = db.iterator()) {
             for (iterator.seekToFirst(); iterator.hasNext(); iterator.next()) {
                 String json = new String(iterator.peekNext().getValue(), StandardCharsets.UTF_8);
                 UTXO utxo = gson.fromJson(json, UTXO.class);
+                System.out.println("utxo: " + utxo.getPubAdd());
                 if (utxo.getPubAdd().equals(pubAdd)) {
+                    utxos.add(utxo);
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return utxos;
+    }
+
+    public static List<UTXO> getUnlockedUTXOsByPubAdd(String pubAdd) {
+        List<UTXO> utxos = new java.util.ArrayList<>();
+        try (DBIterator iterator = db.iterator()) {
+            for (iterator.seekToFirst(); iterator.hasNext(); iterator.next()) {
+                String json = new String(iterator.peekNext().getValue(), StandardCharsets.UTF_8);
+                System.out.println("json: " + json);
+                UTXO utxo = gson.fromJson(json, UTXO.class);
+                if (utxo.getPubAdd().equals(pubAdd) && !utxo.getIsLocked()) {
                     utxos.add(utxo);
                 }
             }
@@ -102,16 +161,17 @@ public class UTXOSet {
     }
 
     public static void removeUTXO(String txId, int index) {
+        System.out.println("Remove UTXO: " + new String(bytes(makeKey(txId, index)), StandardCharsets.UTF_8));
         db.delete(bytes(makeKey(txId, index)));
     }
 
     public static long getBalance(String pubAdd) {
-        long total = -1;
+        long total = 0;
         try (DBIterator iterator = db.iterator()) {
             for (iterator.seekToFirst(); iterator.hasNext(); iterator.next()) {
                 String json = new String(iterator.peekNext().getValue(), StandardCharsets.UTF_8);
                 UTXO utxo = gson.fromJson(json, UTXO.class);
-                if (utxo.getPubAdd().equals(pubAdd)) {
+                if (utxo.getPubAdd().equals(pubAdd) && !utxo.getIsLocked()) {
                     total += utxo.getValue();
                 }
             }
@@ -124,7 +184,7 @@ public class UTXOSet {
     public static void updateWithTransaction(Transaction tx) {
         // Xóa UTXO đã tiêu
         for (TxIn in : tx.getInputs()) {
-            removeUTXO(in.getPrevTxId(), in.getPrevIndex());
+            removeUTXO(in.getPrevTxId(), in.getOutputIndex());
         }
 
         // Thêm UTXO mới

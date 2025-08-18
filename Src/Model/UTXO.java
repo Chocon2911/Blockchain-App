@@ -3,10 +3,10 @@ package Model;
 import java.security.PublicKey;
 
 public class UTXO {
-    private String txId;       // Transaction ID chứa output này
-    private int index;         // Vị trí của output trong transaction
-    private long value;      // Giá trị coin
-    private String pubAdd; // Chủ sở hữu
+    private String txId;
+    private int index;
+    private long value;
+    private String pubAdd;
     private boolean isLocked;
 
     public UTXO(int index, long value, String pubAddress, boolean isLocked) {

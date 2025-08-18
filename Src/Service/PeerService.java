@@ -2,7 +2,7 @@ package Service;
 
 import Model.Block;
 import Model.Transaction;
-import com.google.gson.Gson;
+import com.google.gson.*;
 import com.google.gson.reflect.TypeToken;
 
 import java.lang.reflect.Type;
@@ -12,6 +12,9 @@ import java.net.*;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.security.KeyFactory;
+import java.security.PublicKey;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -30,7 +33,29 @@ public class PeerService {
 
 
      // danh sách host:port
-    private static final Gson gson = new Gson();
+     public static final Gson gson = new GsonBuilder()
+             // byte[] <-> Base64
+             .registerTypeHierarchyAdapter(byte[].class, (JsonSerializer<byte[]>) (src, typeOfSrc, context) ->
+                     new JsonPrimitive(Base64.getEncoder().encodeToString(src))
+             )
+             .registerTypeHierarchyAdapter(byte[].class, (JsonDeserializer<byte[]>) (json, typeOfT, context) ->
+                     Base64.getDecoder().decode(json.getAsString())
+             )
+             // PublicKey <-> Base64
+             .registerTypeHierarchyAdapter(PublicKey.class, (JsonSerializer<PublicKey>) (src, typeOfSrc, context) ->
+                     new JsonPrimitive(Base64.getEncoder().encodeToString(src.getEncoded()))
+             )
+             .registerTypeHierarchyAdapter(PublicKey.class, (JsonDeserializer<PublicKey>) (json, typeOfT, context) -> {
+                 try {
+                     byte[] bytes = Base64.getDecoder().decode(json.getAsString());
+                     KeyFactory keyFactory = KeyFactory.getInstance("EC"); // Hoặc "RSA" nếu bạn dùng RSA
+                     X509EncodedKeySpec spec = new X509EncodedKeySpec(bytes);
+                     return keyFactory.generatePublic(spec);
+                 } catch (Exception e) {
+                     throw new JsonParseException(e);
+                 }
+             })
+             .create();
 
 
 
@@ -79,66 +104,6 @@ public class PeerService {
         } catch (Exception e) {
             return false;
         }
-    }
-
-
-
-    //============================== Minimal Block JSON (de)serialization ==============================
-    private static String blockToJson(Block b) {
-        // Serialize các trường thiết yếu (không có getter version -> đặt mặc định)
-        StringBuilder sb = new StringBuilder();
-        sb.append('{');
-        sb.append("\"type\":\"block\",");
-        sb.append("\"index\":").append(b.getIndex()).append(',');
-        sb.append("\"previousHash\":\"").append(escapeJson(b.getPreviousHash() == null ? "" : b.getPreviousHash())).append("\",");
-        sb.append("\"difficulty\":").append(b.getDifficulty());
-        sb.append('}');
-        return sb.toString();
-    }
-
-    private static Block jsonToBlock(String json) {
-        if (json == null || json.isEmpty()) return null;
-        try {
-            int index = extractJsonValueInt(json, "index", 0);
-            String previousHash = extractJsonValueString(json, "previousHash", "");
-            int difficulty = extractJsonValueInt(json, "difficulty", 1);
-
-            // version mặc định vì không có getter; previousNChainWork=null; transactions rỗng
-            return new Block(index, "0.0.0", previousHash, null, difficulty, new ArrayList<>());
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private static int extractJsonValueInt(String json, String key, int def) {
-        String v = extractJsonValueString(json, key, null);
-        if (v == null) return def;
-        try { return Integer.parseInt(v); } catch (NumberFormatException e) { return def; }
-    }
-
-    private static String extractJsonValueString(String json, String key, String def) {
-        String k = "\"" + key + "\"";
-        int i = json.indexOf(k);
-        if (i < 0) return def;
-        int colon = json.indexOf(':', i + k.length());
-        if (colon < 0) return def;
-        int j = colon + 1;
-        while (j < json.length() && Character.isWhitespace(json.charAt(j))) j++;
-        if (j >= json.length()) return def;
-        if (json.charAt(j) == '"') {
-            int start = j + 1;
-            int end = json.indexOf('"', start);
-            if (end < 0) return def;
-            return json.substring(start, end);
-        } else {
-            int end = j;
-            while (end < json.length() && ",}\n\r\t ".indexOf(json.charAt(end)) == -1) end++;
-            return json.substring(j, end);
-        }
-    }
-
-    private static boolean validateBlock(Block block) {
-        return false;
     }
 
 
@@ -377,7 +342,7 @@ public class PeerService {
             return;
         }
 
-        String blockJson = blockToJson(block);
+        String blockJson = gson.toJson(block);
         if (blockJson == null || blockJson.isEmpty()) {
             System.out.println("[broadcastBlock] Cannot serialize Block to JSON.");
             return;
@@ -386,7 +351,6 @@ public class PeerService {
         List<String> ipAddresses = getLocalIpAddresses();
         int connectedCount = 0;
 
-        // Ưu tiên gửi tới danh sách local
         for (String address : ipAddresses) {
             boolean connected = sendJsonToIp(address, newBlockPort, blockJson);
 
@@ -402,7 +366,6 @@ public class PeerService {
             }
         }
 
-         // Bổ sung từ danh sách global nếu chưa đủ 8
          List<String> globalIpAddresses = getGlobalIpAddresses();
          for (String address : globalIpAddresses) {
              if (ipAddresses.contains(address)) continue;
@@ -471,7 +434,7 @@ public class PeerService {
                         }
 
                         String json = received.toString();
-                        Block block = jsonToBlock(json);
+                        Block block = gson.fromJson(json, Block.class);
                         boolean valid = BlockchainService.examineBlock(block, clientSocket.getInetAddress().getHostAddress());
                         try (BufferedWriter writer = new BufferedWriter(new FileWriter("AnBlock.json"))) {
                             writer.write(json);
@@ -505,12 +468,12 @@ public class PeerService {
     public static void broadcastTransaction(Transaction tx) {
         String txJson = TransactionService.toTransactionJson(tx);
         List<String> peerAddresses;
-        // đọc file json
+        // Read ip addresses file
         try (FileReader reader = new FileReader(ipAddressPath)) {
             Type listType = new TypeToken<List<String>>() {}.getType();
             peerAddresses = gson.fromJson(reader, listType);
         } catch (IOException e) {
-            System.err.println("Lỗi đọc file địa chỉ peer: " + e.getMessage());
+            System.err.println("Can't read ip addresses: " + e.getMessage());
             return;
         }
 
@@ -523,9 +486,9 @@ public class PeerService {
                 // truyền file json của object transaction cho nó
                 out.println(txJson);
                 out.flush();
-                System.out.println("Đã gửi TX tới " + addr);
+                System.out.println("Sent TX to " + addr);
             } catch (IOException e) {
-                System.err.println("Không thể gửi TX tới " + addr + ": " + e.getMessage());
+                System.err.println("Can't send TX to " + addr + ": " + e.getMessage());
             }
         }
     }
@@ -535,14 +498,14 @@ public class PeerService {
             System.out.println("Listening for transactions on port " + port);
             while (true) {
                 Socket socket = serverSocket.accept();
-                System.out.println("Kết nối từ: " + socket.getRemoteSocketAddress());
+                System.out.println("Connection from: " + socket.getRemoteSocketAddress());
 
                 new Thread(() -> handleTransaction(socket)).start();
                 System.out.println("Send succesfully");
             }
 
         } catch (IOException e) {
-            System.err.println("Lỗi khi mở cổng: " + e.getMessage());
+            System.err.println("ERROR listening for transactions: " + e.getMessage());
         }
     }
 
@@ -557,21 +520,18 @@ public class PeerService {
                 return;
             }
 
-            // Parse JSON thành object Transaction
             Transaction tx = TransactionService.fromTransactionJson(json);
-
-            // Xác thực transaction
             boolean valid = TransactionService.validateTransaction(tx);
 
             if (valid) {
-                System.out.println("✅ Transaction hợp lệ: " + tx.getTxId());
+                System.out.println("Transaction valid: " + tx.getTxId());
                 out.println("OK");
             } else {
-                System.out.println("❌ Transaction không hợp lệ: " + tx.getTxId());
+                System.out.println("Transaction invalid: " + tx.getTxId());
                 out.println("FAIL");
             }
         } catch (IOException e) {
-            System.err.println("Lỗi khi nhận transaction: " + e.getMessage());
+            System.err.println("ERROR handling transaction: " + e.getMessage());
         }
     }
 
@@ -587,7 +547,7 @@ public class PeerService {
 
             Socket socket = new Socket(host, blockLocatorPort);
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-            out.println(new Gson().toJson(locator));
+            out.println(gson.toJson(locator));
 
             System.out.println("Sent block locator (" + locator.size() + " hashes) to " + address);
             socket.close();
@@ -603,16 +563,16 @@ public class PeerService {
                 Socket clientSocket = serverSocket.accept();
                 BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
                 String locatorJson = in.readLine();
-                List<String> locator = new Gson().fromJson(locatorJson, List.class);
+                List<String> locator = gson.fromJson(locatorJson, List.class);
 
                 System.out.println("Received block locator with " + locator.size() + " hashes.");
 
-                // Tìm fork point
+                // Find fork point
                 Block forkBlock = findForkPoint(locator);
                 if (forkBlock != null) {
                     System.out.println("Fork point at index: " + forkBlock.getIndex());
 
-                    // Truy từ forkBlock lên tip
+                    // Track from fork point to tip
                     List<Block> blocksToSend = new ArrayList<>();
                     int tipIndex = BlockchainService.getBlockCount() - 1;
                     for (int i = forkBlock.getIndex() + 1; i <= tipIndex; i++) {
@@ -622,7 +582,7 @@ public class PeerService {
                         }
                     }
 
-                    // Gửi list block tới peer
+                    // Send blockchain to peer
                     broadcastBlockchain(blocksToSend, serverSocket.getInetAddress().getHostAddress());
 
                 } else {
@@ -674,13 +634,10 @@ public class PeerService {
     //===================================Blockchain Connection====================================
     public static void broadcastBlockchain(List<Block> blockchain, String address) {
         try {
-            // Giả định blockchain gửi tới 1 peer, tạm hardcode địa chỉ peer
-
             Socket socket = new Socket(address, blockchainPort);
             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
 
-            // Serialize sang JSON
-            String json = new Gson().toJson(blockchain);
+            String json = gson.toJson(blockchain);
             out.println(json);
 
             System.out.println("Broadcasted " + blockchain.size() + " blocks to " + address + ":" + blockchainPort);
@@ -699,7 +656,7 @@ public class PeerService {
                 BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
 
                 String json = in.readLine();
-                Block[] blocks = new Gson().fromJson(json, Block[].class);
+                Block[] blocks = gson.fromJson(json, Block[].class);
                 List<Block> receivedBlocks = Arrays.asList(blocks);
 
                 if (receivedBlocks.isEmpty()) {
@@ -710,25 +667,25 @@ public class PeerService {
 
                 System.out.println("Received " + receivedBlocks.size() + " blocks from peer.");
 
-                // 1️⃣ Xác định earliest index trong dữ liệu nhận
+                // Track earliest index
                 int earliestIndex = receivedBlocks.stream()
                         .mapToInt(Block::getIndex)
                         .min()
                         .orElse(Integer.MAX_VALUE);
 
-                // 2️⃣ Xoá toàn bộ block từ earliestIndex trở đi trong local DB
+                // Delete blocks before earliest index
                 int localCount = BlockchainService.getBlockCount();
                 for (int i = earliestIndex; i < localCount; i++) {
                     BlockchainService.removeBlock(); // Xoá trong LevelDB
                 }
 
-                // Cập nhật lại block count sau khi xoá
+                // Update block count
                 File jsonFile = new File("Db/BlockCount.json");
                 try (FileWriter writer = new FileWriter(jsonFile, false)) {
                     writer.write(String.valueOf(earliestIndex));
                 }
 
-                // 3️⃣ Add các block mới vào DB theo thứ tự
+                // 3️⃣ Add block to Db in order
                 receivedBlocks.sort(Comparator.comparingInt(Block::getIndex));
                 for (Block b : receivedBlocks) {
                     BlockchainService.addBlock(b);

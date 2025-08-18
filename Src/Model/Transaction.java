@@ -24,73 +24,71 @@ public class Transaction {
         this.version = "0.0.1";
         this.inputs = new ArrayList<>();
         this.outputs = new ArrayList<>();
+        this.utxos = new ArrayList<>();
+        this.timestamp = new Date().getTime();
 
-        // Lấy UTXO của người gửi, KHÔNG phải receiver
         Wallet wallet = new Wallet(privateKeySender, publicKeySender);
-        List<UTXO> senderUtxos = UTXOSet.getUTXOsByPubAdd(wallet.getAddress());
+        List<UTXO> senderUtxos = UTXOSet.getUnlockedUTXOsByPubAdd(wallet.getAddress());
+        if (senderUtxos.size() == 0) { System.out.println("No UTXOs found"); }
 
         long totalInput = 0;
         long required = amount + fee;
 
-        // Chọn UTXO cho đến khi đủ amount + fee
         for (UTXO utxo : senderUtxos) {
-            if (utxo.getIsLocked()) continue; // skip UTXO đã bị lock
-
-            // Lock UTXO khi được sử dụng
+            if (utxo.getIsLocked()) continue;
             utxo.setIsLocked(true);
             UTXOSet.addUTXO(utxo);
 
-            inputs.add(new TxIn(utxo.getTxId(), utxo.getIndex(), publicKeySender));
+            System.out.println("index: " + utxo.getIndex());
+            this.inputs.add(new TxIn(utxo.getTxId(), utxo.getIndex(), publicKeySender));
+            System.out.println("In Index: " + utxo.getIndex());
             totalInput += utxo.getValue();
+            System.out.println("Value: " + totalInput);
 
             if (totalInput >= required) break;
         }
 
+        System.out.println("Total input: " + totalInput);
         if (totalInput < required) {
             throw new RuntimeException("Insufficient balance to cover amount + fee");
         }
 
-        // Output cho receiver
         outputs.add(new TxOut(amount, publicAddressReceiver));
-
-        // Nếu còn dư thì trả lại cho sender (change)
         long change = totalInput - amount - fee;
         if (change > 0) {
             this.utxos.add(new UTXO(1, change, wallet.getAddress(), true));
+            outputs.add(new TxOut(change, wallet.getAddress()));
         }
 
-        this.timestamp = new Date().getTime();
-
-        // Tạo hash cho transaction (giản lược, tuỳ bạn có SHA-256 hay double SHA-256)
         this.hash = getTxId();
+        for (UTXO utxo : this.utxos) {
+            utxo.setTxId(hash);
+        }
     }
 
-    public Transaction(String pubAdd, long reward, PublicKey pubKey, Wallet wallet) {
+    public Transaction(long blockReward, List<Transaction> txsInBlock, Wallet wallet) {
         this.version = "0.0.1";
         this.inputs = new ArrayList<>();
         this.outputs = new ArrayList<>();
+        this.utxos = new ArrayList<>();
         this.timestamp = new Date().getTime();
-        this.locktime = this.timestamp + 300000; // ví dụ 5 phút
+        this.locktime = this.timestamp + 300000; // 5 minutes
 
-        // ----- Tạo coinbase input -----
-        String zeroPrevTxId = "0000000000000000000000000000000000000000000000000000000000000000";
-        int voutIndex = -1; // Coinbase tx không tham chiếu output thực tế
-
-        // Ở coinbase tx, scriptSig là dữ liệu tùy ý (extra nonce, thông điệp miner)
-        TxIn coinbaseIn = new TxIn(zeroPrevTxId, voutIndex, pubKey);
-        try {
-            byte[] signature = wallet.sign(this.calculateHash().getBytes());
-            coinbaseIn.setSignature(signature);
-            this.inputs.add(coinbaseIn);
-        } catch (Exception e) {
-            e.printStackTrace();
-            System.out.println("ERROR creating Transaction failed (coinbase transaction)");
+        // ----- Total fee from all transactions -----
+        long totalFee = 0;
+        for (Transaction tx : txsInBlock) {
+            totalFee += tx.calculateFee(); // dùng calculateFee() của từng transaction
         }
 
-        // ----- Tạo output trả phần thưởng về miner -----
-        TxOut rewardOut = new TxOut(reward, pubAdd);
+        // ----- Create transaction output base on fee + block reward -----
+        long totalReward = blockReward + totalFee;
+        TxOut rewardOut = new TxOut(totalReward, wallet.getAddress());
         this.outputs.add(rewardOut);
+
+        // ----- create transaction hash -----
+        this.hash = getTxId();
     }
+
 
     public void addInput(TxIn in) {
         inputs.add(in);
@@ -115,11 +113,15 @@ public class Transaction {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             StringBuilder rawData = new StringBuilder();
             for (TxIn in : inputs) {
-                rawData.append(in.prevTxId).append(in.outputIndex).append(Arrays.toString(in.scriptSig));
+                rawData.append(in.getPrevTxId()).append(in.getOutputIndex()).append(Arrays.toString(in.getSignature()));
             }
             for (TxOut out : outputs) {
                 rawData.append(out.getValue()).append(out.getPublicAdd());
             }
+
+            rawData.append(locktime).append(timestamp);
+            rawData.append(version);
+            rawData.append(locktime);
 
             byte[] hash = digest.digest(rawData.toString().getBytes());
             return bytesToHex(hash);
@@ -129,16 +131,22 @@ public class Transaction {
         }
     }
 
+    public List<UTXO> getUtxos() { return utxos; }
+
     public String calculateHash() {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             StringBuilder rawData = new StringBuilder();
             for (TxIn in : inputs) {
-                rawData.append(in.prevTxId).append(in.outputIndex);
+                rawData.append(in.getPrevTxId()).append(in.getOutputIndex());
             }
             for (TxOut out : outputs) {
                 rawData.append(out.getValue()).append(out.getPublicAdd());
             }
+
+            rawData.append(locktime).append(timestamp);
+            rawData.append(version);
+            rawData.append(locktime);
 
             byte[] hash = digest.digest(rawData.toString().getBytes());
             return bytesToHex(hash);
@@ -169,8 +177,24 @@ public class Transaction {
     }
 
     public boolean isCoinbase() {
-        return inputs.size() == 1 &&
-                inputs.get(0).getPrevTxId().matches("^0+$") &&
-                inputs.get(0).getPrevIndex() == -1;
+        return inputs.size() == 0 &&
+                inputs.get(0).getOutputIndex() == 0;
+    }
+
+    public long calculateFee() {
+        long sumInputs = 0;
+        for (TxIn in : this.inputs) {
+            if (in.getUTXO() != null) {
+                sumInputs += in.getUTXO().getValue();
+            }
+        }
+
+        long sumOutputs = 0;
+        for (TxOut out : this.outputs) {
+            sumOutputs += out.getValue();
+        }
+
+        long fee = sumInputs - sumOutputs;
+        return fee > 0 ? fee : 0;
     }
 }

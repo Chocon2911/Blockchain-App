@@ -1,5 +1,6 @@
 package Model;
 
+import Service.TransactionService;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bitcoinj.core.Base58;
 import java.security.*;
@@ -12,6 +13,8 @@ import org.bouncycastle.jce.spec.ECParameterSpec;
 public class Wallet {
     private PrivateKey privateKey;
     private PublicKey publicKey;
+    private String address;
+
     static {
         Security.addProvider(new BouncyCastleProvider());
     }
@@ -76,4 +79,32 @@ public class Wallet {
             throw new RuntimeException(e);
         }
     }
+
+    public boolean validateWallet() {
+        try {
+            // Kiểm tra nếu cả 2 key không null
+            if (privateKey == null || publicKey == null) {
+                return false;
+            }
+
+            // Tạo dữ liệu test
+            byte[] testData = "test".getBytes();
+
+            // Ký dữ liệu bằng privateKey
+            Signature ecdsaSign = Signature.getInstance("SHA256withECDSA", "BC");
+            ecdsaSign.initSign(privateKey);
+            ecdsaSign.update(testData);
+            byte[] signature = ecdsaSign.sign();
+
+            // Xác thực bằng publicKey
+            Signature ecdsaVerify = Signature.getInstance("SHA256withECDSA", "BC");
+            ecdsaVerify.initVerify(publicKey);
+            ecdsaVerify.update(testData);
+            return ecdsaVerify.verify(signature);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
 }

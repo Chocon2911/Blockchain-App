@@ -1,13 +1,15 @@
 package Model;
 
+import Service.UTXOSet;
+
 import java.security.MessageDigest;
 import java.security.PublicKey;
 
 public class TxIn {
-    public String prevTxId; // Hash của giao dịch trước
-    public int outputIndex; // Vị trí của output
-    public byte[] scriptSig; // Chữ ký (giả lập)
-    public PublicKey pubKey;
+    private String prevTxId;
+    private int outputIndex;
+    private byte[] scriptSig;
+    private PublicKey pubKey;
 
     public TxIn(String txId, int outputIndex, PublicKey pubKey) {
         this.prevTxId = txId;
@@ -20,7 +22,7 @@ public class TxIn {
         return prevTxId;
     }
 
-    public int getPrevIndex() {
+    public int getOutputIndex() {
         return outputIndex;
     }
     public PublicKey getPubKey() {
@@ -28,6 +30,10 @@ public class TxIn {
     }
     public byte[] getSignature() {
         return scriptSig;
+    }
+
+    public UTXO getUTXO() {
+        return UTXOSet.getUTXO(this.prevTxId, this.outputIndex);
     }
 
     public void setSignature(byte[] signature) {
@@ -42,7 +48,7 @@ public class TxIn {
     public byte[] getRawDataToSign() {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            String data = this.getPrevTxId() + this.getPrevIndex();
+            String data = this.getPrevTxId() + this.getOutputIndex();
             return digest.digest(data.getBytes());
         } catch (Exception e) {
             e.printStackTrace();

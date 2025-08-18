@@ -4,7 +4,7 @@ import java.security.*;
 import java.security.PublicKey;
 
 public class TxOut {
-    private long value; // Số lượng Satoshi
+    private long value;
     private String publicAdd;
 
 

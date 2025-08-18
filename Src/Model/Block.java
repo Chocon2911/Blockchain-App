@@ -1,5 +1,7 @@
 package Model;
 
+import Service.TransactionService;
+
 import java.math.BigInteger;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -7,7 +9,8 @@ import java.util.List;
 
 public class Block {
     //==========================================Variable==========================================
-    private static final BigInteger MAX_TARGET = new BigInteger("FFFF0000000000000000000000000000000000000000000000000000", 16);
+    private static final BigInteger MAX_TARGET
+            = BigInteger.ONE.shiftLeft(240);
 
     private final int index;
     private long timestamp;
@@ -20,8 +23,8 @@ public class Block {
     private List<Transaction> transactions = new ArrayList<>();
 
     //========================================Constructor=========================================
-    public Block(int index, String version, String previousHash,
-                 BigInteger previousNChainWork, int difficulty, List<Transaction> transactions) {
+    public Block(Wallet minerWallet, int index, String version, String previousHash, BigInteger previousNChainWork,
+                 int difficulty, List<Transaction> transactions) {
         this.index = index;
         this.version = version;
         this.previousHash = previousHash;
@@ -31,6 +34,9 @@ public class Block {
         this.transactions = transactions;
         this.merkleRoot = this.calculateMerkleTree();
         this.timestamp = System.currentTimeMillis();
+        Transaction coinbase = new Transaction(this.getReward(), transactions, minerWallet);
+        TransactionService.addToMempool(coinbase);
+        this.transactions.add(coinbase);
     }
 
     public Block(int index, String version, String previousHash, BigInteger previousNChainWork,
@@ -111,13 +117,19 @@ public class Block {
 
     //===========================================Method===========================================
     public boolean mineBlock(int nonce) {
+        int currNonce = this.nonce;
+        this.nonce = nonce;
         BigInteger target = getTarget();
         String hashHex = applySha256(applySha256(this.getHeader()));
         BigInteger hashVal = new BigInteger(hashHex, 16);
+//        System.out.println("Nonce: " + nonce + " -> Hash: " + hashHex);
+        if (hashVal.compareTo(target) <= 0) {
+            System.out.println("Found! Nonce: " + nonce + " -> Hash: " + hashHex);
+            return true;
+        }
 
-        if (hashVal.compareTo(target) > 0) return false;
-        this.nonce = nonce;
-        return true;
+        this.nonce = currNonce;
+        return false;
     }
 
     // Lightweight SHA-256 helper to avoid external dependencies
@@ -170,7 +182,7 @@ public class Block {
 
         List<String> currentLayer = new ArrayList<>();
         for (Transaction tx : this.transactions) {
-            currentLayer.add(tx.calculateHash());
+            currentLayer.add(tx.getTxId());
         }
 
         while (currentLayer.size() > 1) {
@@ -187,5 +199,13 @@ public class Block {
         }
 
         return currentLayer.get(0);
+    }
+
+    public void createCoinBaseTransaction(String minerAddress) {
+        for (Transaction tx : this.transactions) {
+            for (TxOut txOut : tx.getOutputs()) {
+
+            }
+        }
     }
 }
